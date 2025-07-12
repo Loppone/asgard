@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.36105.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6C83A596-D32D-B35F-00DD-F0C99B673980}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Abstractions", "Abstractions", "{3547F6C1-4644-4CE1-BA81-DB6B92A78694}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "RabbitMQ", "RabbitMQ", "{BB753FC4-FE73-423B-A166-9272024C4224}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.Abstraction", "src\Abstractions\Asgard.Abstraction\Asgard.Abstraction.csproj", "{CD6C324B-53D3-43B3-A219-8DADB46A97DD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.Abstraction.Test", "src\Abstractions\Asgard.Abstraction.Test\Asgard.Abstraction.Test.csproj", "{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.RabbitMQ", "src\RabbitMQ\Asgard.RabbitMQ\Asgard.RabbitMQ.csproj", "{C7F39F89-0A2D-07B5-8F35-19D196A07C4F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.RabbitMQ.Test", "src\RabbitMQ\Asgard.RabbitMQ.Test\Asgard.RabbitMQ.Test.csproj", "{E288232F-0D48-CD50-627B-05E5141BC21F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CD6C324B-53D3-43B3-A219-8DADB46A97DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD6C324B-53D3-43B3-A219-8DADB46A97DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD6C324B-53D3-43B3-A219-8DADB46A97DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD6C324B-53D3-43B3-A219-8DADB46A97DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E288232F-0D48-CD50-627B-05E5141BC21F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E288232F-0D48-CD50-627B-05E5141BC21F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E288232F-0D48-CD50-627B-05E5141BC21F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E288232F-0D48-CD50-627B-05E5141BC21F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3547F6C1-4644-4CE1-BA81-DB6B92A78694} = {6C83A596-D32D-B35F-00DD-F0C99B673980}
+		{BB753FC4-FE73-423B-A166-9272024C4224} = {6C83A596-D32D-B35F-00DD-F0C99B673980}
+		{CD6C324B-53D3-43B3-A219-8DADB46A97DD} = {3547F6C1-4644-4CE1-BA81-DB6B92A78694}
+		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8} = {3547F6C1-4644-4CE1-BA81-DB6B92A78694}
+		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F} = {BB753FC4-FE73-423B-A166-9272024C4224}
+		{E288232F-0D48-CD50-627B-05E5141BC21F} = {BB753FC4-FE73-423B-A166-9272024C4224}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A817A10A-DD03-477B-9982-5D21EA67BA5F}
+	EndGlobalSection
+EndGlobal
