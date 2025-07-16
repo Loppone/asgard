@@ -5,63 +5,67 @@
 /// </summary>
 internal sealed class RabbitMQTopologyInitializer(
     IRabbitMQTopologyBuilder builder,
-    IOptions<RabbitMQOptions> options,
-    IOptions<RabbitMQSubscriptionOptions> subscriptionOptions) 
+    IOptions<RabbitMQSubscriptionOptions> subscriptionOptions)
     : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var opts = options.Value;
         var configs = subscriptionOptions.Value.Configurations;
 
+        if (configs.Count == 0)
+            throw new InvalidOperationException("No RabbitMQ configurations found.");
+
+        var mainConfig = configs.First();
+
         // Exchange principale
-        await builder.DeclareExchangeAsync(opts.Exchange, opts.ExchangeType);
+        await builder.DeclareExchangeAsync(mainConfig.Exchange, mainConfig.ExchangeType);
 
-        foreach (var config in configs)
+        foreach (var conf in configs)
         {
-            // Queue principale
-            await builder.DeclareQueueAsync(config.Queue);
+            // Coda principale
+            var mainQueueArgs = new Dictionary<string, object?>();
 
-            foreach (var binding in config.Bindings)
+            if (!string.IsNullOrWhiteSpace(conf.DeadLetterExchange))
+            {
+                mainQueueArgs["x-dead-letter-exchange"] = conf.DeadLetterExchange;
+                mainQueueArgs["x-dead-letter-routing-key"] = conf.Bindings.FirstOrDefault()?.RoutingKey ?? "";
+            }
+            await builder.DeclareQueueAsync(conf.Queue, mainQueueArgs);
+
+            foreach (var binding in conf.Bindings)
             {
                 // Binding queue principale su tutte le routing key
                 await builder.BindQueueAsync(
-                    config.Queue,
-                    opts.Exchange,
+                    conf.Queue,
+                    mainConfig.Exchange,
                     binding.RoutingKey
                 );
 
-                // Retry queue(s)
+                // Coda retry (una sola, TTL nel messaggio)
                 if (binding.RetryQueue is not null && binding.Retry is not null)
                 {
-                    foreach (var delay in binding.Retry.DelaysSeconds)
+                    var args = new Dictionary<string, object?>
                     {
-                        var retryQueue = $"{binding.RetryQueue}.{delay}s";
+                        ["x-dead-letter-exchange"] = mainConfig.Exchange,
+                        ["x-dead-letter-routing-key"] = binding.RoutingKey ?? ""
+                    };
 
-                        var args = new Dictionary<string, object?>
-                        {
-                            ["x-dead-letter-exchange"] = opts.Exchange,
-                            ["x-dead-letter-routing-key"] = binding.RoutingKey ?? "",
-                            ["x-message-ttl"] = delay * 1000
-                        };
+                    await builder.DeclareQueueAsync(binding.RetryQueue, args);
 
-                        await builder.DeclareQueueAsync(retryQueue, args);
-
-                        if (!string.IsNullOrWhiteSpace(config.RetryExchange))
-                        {
-                            await builder.DeclareExchangeAsync(config.RetryExchange, config.RetryExchangeType ?? "fanout");
-                            await builder.BindQueueAsync(retryQueue, config.RetryExchange, binding.RoutingKey);
-                        }
+                    if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
+                    {
+                        await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
+                        await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange, binding.RoutingKey);
                     }
                 }
             }
 
             // DLQ
-            if (config.DeadLetterQueue is not null && config.DeadLetterExchange is not null)
+            if (conf.DeadLetterQueue is not null && conf.DeadLetterExchange is not null)
             {
-                await builder.DeclareExchangeAsync(config.DeadLetterExchange, config.DeadLetterExchangeType ?? "fanout");
-                await builder.DeclareQueueAsync(config.DeadLetterQueue);
-                await builder.BindQueueAsync(config.DeadLetterQueue, config.DeadLetterExchange);
+                await builder.DeclareExchangeAsync(conf.DeadLetterExchange, conf.DeadLetterExchangeType ?? "fanout");
+                await builder.DeclareQueueAsync(conf.DeadLetterQueue);
+                await builder.BindQueueAsync(conf.DeadLetterQueue, conf.DeadLetterExchange);
             }
         }
     }

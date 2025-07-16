@@ -8,12 +8,14 @@ public class RabbitMQConfiguration
 {
     public string Queue { get; set; } = default!;
 
+    public string Exchange { get; set; } = default!;
+    public string ExchangeType { get; set; } = "fanout";
+
     public string? RetryExchange { get; set; }
     public string? RetryExchangeType { get; set; } = "fanout";
 
     public string? DeadLetterExchange { get; set; }
     public string? DeadLetterExchangeType { get; set; } = "fanout";
-
     public string? DeadLetterQueue { get; set; }
 
     /// <summary>

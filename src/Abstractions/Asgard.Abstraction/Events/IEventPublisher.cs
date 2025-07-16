@@ -28,6 +28,7 @@ public interface IEventPublisher
     /// <param name="cancellationToken">Token di cancellazione.</param>
     Task PublishAsync<TPayload>(
         TPayload payload, 
-        CloudEventOptions options, 
+        CloudEventOptions options,
+        string? routingKey = null,
         CancellationToken cancellationToken = default);
 }

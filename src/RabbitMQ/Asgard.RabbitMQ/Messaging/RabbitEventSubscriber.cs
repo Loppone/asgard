@@ -10,10 +10,13 @@ internal sealed class RabbitEventSubscriber(
     ICloudEventDispatcher dispatcher,
     IRabbitMQRetryHandler retryHandler,
     IOptions<RabbitMQOptions> options,
-    RabbitMQConfiguration config) : IEventSubscriber
+    IOptions<RabbitMQSubscriptionOptions> config)
+    : IEventSubscriber
 {
     public async Task SubscribeAsync(CancellationToken cancellationToken = default)
     {
+        var configuation = config.Value.Configurations.Single();
+
         var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName, cancellationToken);
         var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
@@ -33,13 +36,13 @@ internal sealed class RabbitEventSubscriber(
             }
             catch
             {
-                await retryHandler.HandleRetryAsync(channel, ea, config, cancellationToken);
+                await retryHandler.HandleRetryAsync(channel, ea, configuation, cancellationToken);
             }
 
         };
 
         await channel.BasicConsumeAsync(
-            queue: config.Queue,
+            queue: configuation.Queue,
             autoAck: false,
             consumer: consumer,
             cancellationToken: cancellationToken);

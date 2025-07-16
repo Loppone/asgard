@@ -14,18 +14,6 @@ public class RabbitMQOptions
     public bool UseSsl { get; set; } = false;
 
     /// <summary>
-    /// Nome dell'exchange principale su cui pubblicare.
-    /// (es. "ex.harleydikkinson")
-    /// </summary>
-    public string Exchange { get; set; } = default!;
-
-    /// <summary>
-    /// Tipo di exchange (direct, fanout, topic).
-    /// Default = direct.
-    /// </summary>
-    public string ExchangeType { get; set; } = "direct";
-
-    /// <summary>
     /// Nome identificativo del client (usato nella connessione).
     /// </summary>
     public string ClientName { get; set; } = "asgard-client";

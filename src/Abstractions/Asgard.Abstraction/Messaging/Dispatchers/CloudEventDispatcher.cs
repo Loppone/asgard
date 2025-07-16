@@ -19,19 +19,19 @@ public sealed class CloudEventDispatcher(
     {
         ArgumentNullException.ThrowIfNull(cloudEvent);
 
-        // 1. Risolvi il .NET type dal valore CloudEvent.Type
+        // Risolve il tipo dal valore CloudEvent.Type
         var targetType = typeMapper.Resolve(cloudEvent.Type) ?? 
             throw new InvalidOperationException($"No type mapping found for CloudEvent.Type '{cloudEvent.Type}'.");
 
-        // 2. Deserializza il payload nel tipo corretto
+        // Deserializza il payload nel tipo corretto
         var message = serializer.Deserialize(cloudEvent.Data, targetType);
 
-        // 3. Risolvi dinamicamente ICloudEventHandler<T>
+        // Risolve dinamicamente ICloudEventHandler<T>
         var handlerType = typeof(ICloudEventHandler<>).MakeGenericType(targetType);
         var handler = serviceProvider.GetService(handlerType) ?? 
             throw new InvalidOperationException($"No ICloudEventHandler registered for type '{cloudEvent.Type}'.");
 
-        // 4. Invoca HandleAsync tramite reflection (o DynamicInvoke)
+        // Invoca l'handler tramite reflection
         var method = handlerType.GetMethod(
             nameof(ICloudEventHandler<object>.HandleAsync),
             BindingFlags.Public | BindingFlags.Instance) ?? throw new MissingMethodException(handlerType.FullName,

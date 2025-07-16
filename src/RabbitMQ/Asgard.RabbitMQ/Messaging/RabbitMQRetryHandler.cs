@@ -1,4 +1,6 @@
-﻿namespace Asgard.RabbitMQ.Messaging;
+﻿using System.Text;
+
+namespace Asgard.RabbitMQ.Messaging;
 
 /// <summary>
 /// Gestisce la logica di retry per i messaggi RabbitMQ che falliscono la gestione.
@@ -17,7 +19,9 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         var routingKey = args.RoutingKey ?? string.Empty;
 
         // Trova la configurazione di retry associata alla routing key
-        var retryConfig = config.Bindings.FirstOrDefault(b => b.RoutingKey == routingKey);
+        var retryConfig = config.Bindings.FirstOrDefault(b => b.RoutingKey == routingKey)
+                       ?? config.Bindings.FirstOrDefault(b => b.RoutingKey is null);
+
         if (retryConfig is null || retryConfig.Retry is null || string.IsNullOrWhiteSpace(retryConfig.RetryQueue))
         {
             // Nessuna configurazione valida, manda direttamente in DLQ
@@ -33,7 +37,19 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
             ? deathRaw as IList<object>
             : null;
 
-        var retryCount = xDeath?.Count ?? 0;
+
+        var retryCount = 0;
+
+        if (xDeath is [var entryRaw] && entryRaw is Dictionary<string, object> entry)
+        {
+            if (entry.TryGetValue("queue", out var queueObj) &&
+                Encoding.UTF8.GetString((byte[])queueObj) == retryConfig.RetryQueue &&
+                entry.TryGetValue("count", out var countObj))
+            {
+                retryCount = Convert.ToInt32(countObj);
+            }
+        }
+
         if (retryCount >= retrySettings.MaxRetries)
         {
             // Superato numero massimo -> DLQ
@@ -42,22 +58,33 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         }
 
         // Ripubblica sul retry exchange usando la routing key della retry queue
+        if (string.IsNullOrWhiteSpace(config.RetryExchange))
+        {
+            // Exchange non configurato, manda in DLQ
+            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken);
+            return;
+        }
+
+        // Delay dinamico per questo retry (es. DelaysSeconds[retryCount])
+        var delaySeconds = retrySettings.DelaysSeconds.ElementAtOrDefault(retryCount);
+
+        if (delaySeconds <= 0)
+        {
+            // Se delay non previsto → manda in DLQ
+            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken);
+            return;
+        }
+
         var originalProps = args.BasicProperties;
 
         var props = new BasicProperties
         {
             ContentType = originalProps?.ContentType,
             DeliveryMode = originalProps?.DeliveryMode ?? DeliveryModes.Persistent,
-            Headers = originalProps?.Headers
+            Headers = originalProps?.Headers,
+            Expiration = (delaySeconds * 1000).ToString()
         };
 
-
-        if (string.IsNullOrWhiteSpace(config.RetryExchange))
-        {
-            // Configurazione mancante → DLQ
-            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
-            return;
-        }
 
         await channel.BasicPublishAsync(
             exchange: config.RetryExchange,
@@ -69,6 +96,9 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         );
 
         // Ack del messaggio originale
-        await channel.BasicAckAsync(args.DeliveryTag, false, cancellationToken);
+        //await channel.BasicAckAsync(args.DeliveryTag, false, cancellationToken);
+
+        await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, cancellationToken);
+
     }
 }
