@@ -32,29 +32,30 @@ internal sealed class RabbitMQTopologyInitializer(
             }
             await builder.DeclareQueueAsync(conf.Queue, mainQueueArgs);
 
-            var declaredRetryQueues = new HashSet<string>();
-
             foreach (var binding in conf.Bindings)
             {
+                // Binding queue principale su tutte le routing key
+                await builder.BindQueueAsync(
+                    conf.Queue,
+                    mainConfig.Exchange,
+                    binding.RoutingKey
+                );
+
+                // Coda retry (una sola, TTL nel messaggio)
                 if (binding.RetryQueue is not null && binding.Retry is not null)
                 {
-                    if (declaredRetryQueues.Add(binding.RetryQueue))
+                    var args = new Dictionary<string, object?>
                     {
-                        var args = new Dictionary<string, object?>
-                        {
-                            ["x-dead-letter-exchange"] = conf.Exchange
-                        };
+                        ["x-dead-letter-exchange"] = mainConfig.Exchange
+                    };
 
-                        await builder.DeclareQueueAsync(binding.RetryQueue, args);
+                    await builder.DeclareQueueAsync(binding.RetryQueue, args);
 
-                        if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
-                        {
-                            await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
-                        }
+                    if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
+                    {
+                        await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
+                        await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange);
                     }
-
-                    // Binding della coda retry alla routing key specifica
-                    await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange!, binding.RoutingKey);
                 }
             }
 
