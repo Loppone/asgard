@@ -5,4 +5,5 @@ public interface ICloudEventTypeMapper
 {
     void Register<T>(string typeName);
     Type? Resolve(string typeName);
+    public string? GetTypeName(Type type);
 }

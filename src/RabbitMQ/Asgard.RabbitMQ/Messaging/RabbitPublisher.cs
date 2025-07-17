@@ -8,6 +8,7 @@ internal sealed class RabbitPublisher(
     IConnectionFactory connectionFactory,
     IOptions<RabbitMQOptions> options,
     IOptions<RabbitMQSubscriptionOptions> subscriptionOptions,
+    ICloudEventTypeMapper typeMapper,
     ICloudEventSerializer serializer) : IEventPublisher
 {
     private readonly RabbitMQConfiguration _config = subscriptionOptions.Value.Configurations
@@ -48,13 +49,14 @@ internal sealed class RabbitPublisher(
     string? routingKey = null,
     CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(options.Type))
-            throw new ArgumentException("The 'Type' field in CloudEventOptions must be provided.", nameof(options));
+        var type = typeMapper.GetTypeName(typeof(TPayload))
+            ?? throw new InvalidOperationException(
+                $"Missing CloudEvent type mapping for {typeof(TPayload).FullName}");
 
         if (string.IsNullOrWhiteSpace(options.Source))
             throw new ArgumentException("The 'Source' field in CloudEventOptions must be provided.", nameof(options));
 
-        var cloudEvent = CloudEvent.Create(payload, options.Type, options.Source, options.ContentType);
+        var cloudEvent = CloudEvent.Create(payload, type, options.Source, options.ContentType);
 
         if (!string.IsNullOrWhiteSpace(routingKey))
         {

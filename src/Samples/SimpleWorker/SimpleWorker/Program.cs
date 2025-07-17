@@ -41,7 +41,6 @@ internal class Program
             new UserCreated(Guid.NewGuid(), "example@email.com"),
             new CloudEventOptions
             {
-                Type = "asgard",
                 Source = "sample-app"
             },
             ROUTINGKEY,

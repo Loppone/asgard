@@ -9,7 +9,7 @@
 public sealed class CloudEventOptions
 {
     /// <summary>Identifica semanticamente il tipo dell’evento (es. "Customer.Created").</summary>
-    public string? Type { get; init; }
+    //public string? Type { get; init; }
 
     /// <summary>Identifica la sorgente logica dell'evento (es. "crm-service").</summary>
     public string? Source { get; init; }

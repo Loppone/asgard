@@ -108,7 +108,6 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         var payload = new TestPayload("hello-world");
         await publisher.PublishAsync(payload, new CloudEventOptions
         {
-            Type = "asgard.test",
             Source = "test-suite"
         });
 

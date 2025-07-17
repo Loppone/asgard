@@ -9,6 +9,17 @@ namespace Asgard.RabbitMQ.Messaging;
 public sealed class CloudEventTypeMapper : ICloudEventTypeMapper
 {
     private readonly ConcurrentDictionary<string, Type> _map = new();
+    private readonly ConcurrentDictionary<Type, string> _reverseMap = new();
+
+    /// <summary>
+    /// Risolve il valore CloudEvent.Type associato a un tipo .NET, se registrato.
+    /// </summary>
+    public string? GetTypeName(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        return _reverseMap.TryGetValue(type, out var typeName) ? typeName : null;
+    }
 
     /// <summary>
     /// Registra il tipo .NET associato a un identificatore logico (CloudEvent.Type).
@@ -17,7 +28,9 @@ public sealed class CloudEventTypeMapper : ICloudEventTypeMapper
     {
         ArgumentNullException.ThrowIfNull(typeName);
 
-        _map[typeName] = typeof(T);
+        var type = typeof(T);
+        _map[typeName] = type;
+        _reverseMap[type] = typeName;
     }
 
     /// <summary>
