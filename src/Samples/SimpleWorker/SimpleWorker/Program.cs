@@ -7,20 +7,29 @@ using Asgard.Abstraction.Messaging.Handlers;
 using SimpleWorker;
 using Asgard.Abstraction.Events;
 using Microsoft.Extensions.Options;
+using Asgard.Abstraction.Messaging.Dispatchers;
+using Asgard.RabbitMQ.Messaging;
 
 internal class Program
 {
     private static async Task Main(string[] args)
     {
         const string ROUTINGKEY = "asgard";
-        
+
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Configuration.AddJsonFile("appsettings.json", optional: false);
-        
+
         builder.Services.AddRabbitMQ(builder.Configuration);
 
         builder.Services.AddSingleton<ICloudEventHandler<UserCreated>, UserCreatedHandler>();
+
+        builder.Services.AddSingleton<ICloudEventTypeMapper>(sp =>
+         {
+             var mapper = new CloudEventTypeMapper();
+             mapper.Register<UserCreated>("asgard");
+             return mapper;
+         });
 
         var app = builder.Build();
         await app.StartAsync();
@@ -32,7 +41,7 @@ internal class Program
             new UserCreated(Guid.NewGuid(), "example@email.com"),
             new CloudEventOptions
             {
-                Type = "user.created",
+                Type = "asgard",
                 Source = "sample-app"
             },
             ROUTINGKEY,
