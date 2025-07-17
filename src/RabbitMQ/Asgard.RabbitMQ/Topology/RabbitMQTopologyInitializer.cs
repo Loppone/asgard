@@ -32,31 +32,29 @@ internal sealed class RabbitMQTopologyInitializer(
             }
             await builder.DeclareQueueAsync(conf.Queue, mainQueueArgs);
 
+            var declaredRetryQueues = new HashSet<string>();
+
             foreach (var binding in conf.Bindings)
             {
-                // Binding queue principale su tutte le routing key
-                await builder.BindQueueAsync(
-                    conf.Queue,
-                    mainConfig.Exchange,
-                    binding.RoutingKey
-                );
-
-                // Coda retry (una sola, TTL nel messaggio)
                 if (binding.RetryQueue is not null && binding.Retry is not null)
                 {
-                    var args = new Dictionary<string, object?>
+                    if (declaredRetryQueues.Add(binding.RetryQueue))
                     {
-                        ["x-dead-letter-exchange"] = mainConfig.Exchange,
-                        ["x-dead-letter-routing-key"] = binding.RoutingKey ?? ""
-                    };
+                        var args = new Dictionary<string, object?>
+                        {
+                            ["x-dead-letter-exchange"] = conf.Exchange
+                        };
 
-                    await builder.DeclareQueueAsync(binding.RetryQueue, args);
+                        await builder.DeclareQueueAsync(binding.RetryQueue, args);
 
-                    if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
-                    {
-                        await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
-                        await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange, binding.RoutingKey);
+                        if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
+                        {
+                            await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
+                        }
                     }
+
+                    // Binding della coda retry alla routing key specifica
+                    await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange!, binding.RoutingKey);
                 }
             }
 
