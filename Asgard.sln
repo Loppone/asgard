@@ -17,6 +17,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.RabbitMQ", "src\Rabb
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Asgard.RabbitMQ.Test", "src\RabbitMQ\Asgard.RabbitMQ.Test\Asgard.RabbitMQ.Test.csproj", "{E288232F-0D48-CD50-627B-05E5141BC21F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{92FAB59C-2120-4491-A826-FCEBE2A3C2C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleWorker", "src\Samples\SimpleWorker\SimpleWorker\SimpleWorker.csproj", "{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +43,10 @@ Global
 		{E288232F-0D48-CD50-627B-05E5141BC21F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E288232F-0D48-CD50-627B-05E5141BC21F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E288232F-0D48-CD50-627B-05E5141BC21F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,6 +58,8 @@ Global
 		{DA0DD148-7A2D-4C31-A2BD-8B5DA2256BC8} = {3547F6C1-4644-4CE1-BA81-DB6B92A78694}
 		{C7F39F89-0A2D-07B5-8F35-19D196A07C4F} = {BB753FC4-FE73-423B-A166-9272024C4224}
 		{E288232F-0D48-CD50-627B-05E5141BC21F} = {BB753FC4-FE73-423B-A166-9272024C4224}
+		{92FAB59C-2120-4491-A826-FCEBE2A3C2C4} = {6C83A596-D32D-B35F-00DD-F0C99B673980}
+		{3A2C53BC-1691-4A4A-9A1E-A8FAF1032B82} = {92FAB59C-2120-4491-A826-FCEBE2A3C2C4}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A817A10A-DD03-477B-9982-5D21EA67BA5F}

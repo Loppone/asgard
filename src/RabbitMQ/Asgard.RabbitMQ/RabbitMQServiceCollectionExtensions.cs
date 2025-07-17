@@ -25,7 +25,7 @@ public static class RabbitMQServiceCollectionExtensions
                 opts.Configurations = [.. configurations];
             });
         else if (configuration is not null)
-            services.Configure<RabbitMQSubscriptionOptions>(configuration.GetSection("RabbitMQConfiguration"));
+            services.Configure<RabbitMQSubscriptionOptions>(configuration.GetSection("RabbitMQSubscriptionOptions"));
 
         services.AddSingleton<RabbitMQClient.IConnectionFactory>(sp =>
         {
