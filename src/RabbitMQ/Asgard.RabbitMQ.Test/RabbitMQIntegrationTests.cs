@@ -148,11 +148,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source")
             with
+        {
+            Extensions = new Dictionary<string, object>
             {
-                Extensions = new Dictionary<string, object>
-                {
-                    ["routingKey"] = "rk.test" 
-                }
+                ["routingKey"] = "rk.test"
+            }
         };
 
         var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
@@ -233,7 +233,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         await using var channel = await connection.CreateChannelAsync();
 
         // Polling attivo per attendere la comparsa in DLQ
-        for (var i = 0; i < 30; i++) 
+        for (var i = 0; i < 30; i++)
         {
             result = await channel.BasicGetAsync("queue.asgard-dead", autoAck: true);
             if (result is not null)
@@ -435,7 +435,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Should_Work_With_Multiple_Bindings()
+    public async Task Should_Handle_MultipleRoutingKeys_WithSharedRetryQueue()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
 
@@ -445,33 +445,34 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var config = new RabbitMQConfiguration
         {
-            Exchange = "ex.multi-binding",
-            RetryExchange = "ex.multi-retry",
-            DeadLetterExchange = "ex.multi-dead",
-            Queue = "queue.multi",
-            DeadLetterQueue = "queue.multi-dead",
+            Exchange = "ex.shared",
+            RetryExchange = "ex.shared.retry",
+            DeadLetterExchange = "ex.shared.dead",
+            Queue = "queue.shared.main",
+            DeadLetterQueue = "queue.shared.dead",
             Bindings =
             [
                 new()
-            {
-                RoutingKey = "rk.1",
-                RetryQueue = "queue.multi-retry",
-                Retry = new RetrySettings
                 {
-                    MaxRetries = 2,
-                    DelaysSeconds = [2, 2]
-                }
-            },
-            new()
-            {
-                RoutingKey = "rk.2",
-                RetryQueue = "queue.multi-retry",
-                Retry = new RetrySettings
+                    RetryQueue = "queue.shared.retry",
+                    RoutingKey = "rk.alpha",
+                    Retry = new RetrySettings
+                    {
+
+                        MaxRetries = 2,
+                        DelaysSeconds = [2, 4]
+                    }
+                },
+                new()
                 {
-                    MaxRetries = 1,
-                    DelaysSeconds = [3]
+                    RetryQueue = "queue.shared.retry",
+                    RoutingKey = "rk.beta",
+                    Retry = new RetrySettings
+                    {
+                        MaxRetries = 3,
+                        DelaysSeconds = [3, 3, 5]
+                    }
                 }
-            }
             ]
         };
 
@@ -483,7 +484,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                     {
                         opt.HostName = host;
                         opt.Port = port;
-                        opt.ClientName = "test-multi-binding";
+                        opt.ClientName = "test-shared";
                     },
                     configurations: [config]
                 );
@@ -510,14 +511,14 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var publisher = hostBuilder.Services.GetRequiredService<IEventPublisher>();
 
-        var cloudEvent1 = CloudEvent.Create(new TestPayload("payload-1"), "asgard.test", "test-source") with
+        var cloudEvent1 = CloudEvent.Create(new TestPayload("payload-alpha"), "asgard.test", "test-source") with
         {
-            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.1" }
+            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.alpha" }
         };
 
-        var cloudEvent2 = CloudEvent.Create(new TestPayload("payload-2"), "asgard.test", "test-source") with
+        var cloudEvent2 = CloudEvent.Create(new TestPayload("payload-beta"), "asgard.test", "test-source") with
         {
-            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.2" }
+            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.beta" }
         };
 
         await publisher.PublishAsync(cloudEvent1, cts.Token);
@@ -537,21 +538,22 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         for (int i = 0; i < 20 && foundPayloads.Count < 2; i++)
         {
-            var result = await channel.BasicGetAsync("queue.multi-dead", autoAck: true);
+            var result = await channel.BasicGetAsync("queue.shared.dead", autoAck: true);
 
             if (result is not null)
             {
                 var body = Encoding.UTF8.GetString(result.Body.ToArray());
-                if (body.Contains("payload-1")) foundPayloads.Add("payload-1");
-                if (body.Contains("payload-2")) foundPayloads.Add("payload-2");
+                if (body.Contains("payload-alpha")) foundPayloads.Add("payload-alpha");
+                if (body.Contains("payload-beta")) foundPayloads.Add("payload-beta");
             }
 
             await Task.Delay(1000, cts.Token);
         }
 
-        foundPayloads.Should().Contain("payload-1");
-        foundPayloads.Should().Contain("payload-2");
+        foundPayloads.Should().Contain("payload-alpha");
+        foundPayloads.Should().Contain("payload-beta");
 
         await hostBuilder.StopAsync();
     }
+
 }

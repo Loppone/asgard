@@ -88,7 +88,7 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
 
         await channel.BasicPublishAsync(
             exchange: config.RetryExchange,
-            routingKey: retryConfig.RetryQueue,
+            routingKey: routingKey,
             mandatory: false,
             basicProperties: props,
             body: args.Body,

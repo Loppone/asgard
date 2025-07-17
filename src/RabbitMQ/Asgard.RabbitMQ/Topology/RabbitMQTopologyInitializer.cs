@@ -47,7 +47,6 @@ internal sealed class RabbitMQTopologyInitializer(
                     var args = new Dictionary<string, object?>
                     {
                         ["x-dead-letter-exchange"] = mainConfig.Exchange,
-                        ["x-dead-letter-routing-key"] = binding.RoutingKey ?? ""
                     };
 
                     await builder.DeclareQueueAsync(binding.RetryQueue, args);
