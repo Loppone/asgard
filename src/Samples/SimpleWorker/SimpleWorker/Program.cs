@@ -9,44 +9,38 @@ using Asgard.Abstraction.Events;
 using Asgard.Abstraction.Messaging.Dispatchers;
 using Asgard.RabbitMQ.Messaging;
 
-internal class Program
-{
-    private static async Task Main(string[] args)
+const string ROUTINGKEY = "asgard";
+
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Configuration.AddJsonFile("appsettings.json", optional: false);
+
+builder.Services.AddRabbitMQ(builder.Configuration);
+
+builder.Services.AddSingleton<ICloudEventHandler<UserCreated>, UserCreatedHandler>();
+
+builder.Services.AddSingleton<ICloudEventTypeMapper>(sp =>
+ {
+     var mapper = new CloudEventTypeMapper();
+     mapper.Register<UserCreated>("asgard");
+     return mapper;
+ });
+
+var app = builder.Build();
+await app.StartAsync();
+
+Console.Clear();
+
+// Simula una pubblicazione all'avvio
+var publisher = app.Services.GetRequiredService<IEventPublisher>();
+
+await publisher.PublishAsync(
+    new UserCreated(Guid.NewGuid(), "example@email.com"),
+    new CloudEventOptions
     {
-        const string ROUTINGKEY = "asgard";
+        Source = "sample-app"
+    },
+    ROUTINGKEY,
+    CancellationToken.None);
 
-        var builder = Host.CreateApplicationBuilder(args);
-
-        builder.Configuration.AddJsonFile("appsettings.json", optional: false);
-
-        builder.Services.AddRabbitMQ(builder.Configuration);
-
-        builder.Services.AddSingleton<ICloudEventHandler<UserCreated>, UserCreatedHandler>();
-
-        builder.Services.AddSingleton<ICloudEventTypeMapper>(sp =>
-         {
-             var mapper = new CloudEventTypeMapper();
-             mapper.Register<UserCreated>("asgard");
-             return mapper;
-         });
-
-        var app = builder.Build();
-        await app.StartAsync();
-
-        Console.Clear();
-
-        // Simula una pubblicazione all'avvio
-        var publisher = app.Services.GetRequiredService<IEventPublisher>();
-
-        await publisher.PublishAsync(
-            new UserCreated(Guid.NewGuid(), "example@email.com"),
-            new CloudEventOptions
-            {
-                Source = "sample-app"
-            },
-            ROUTINGKEY,
-            CancellationToken.None);
-
-        await app.RunAsync();
-    }
-}
+await app.RunAsync();

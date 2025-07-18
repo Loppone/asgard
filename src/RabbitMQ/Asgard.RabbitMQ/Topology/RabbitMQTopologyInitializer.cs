@@ -1,4 +1,5 @@
-﻿using Asgard.RabbitMQ.Internal;
+﻿using System.Diagnostics.Metrics;
+using Asgard.RabbitMQ.Internal;
 
 namespace Asgard.RabbitMQ.Topology;
 
@@ -18,56 +19,58 @@ internal sealed class RabbitMQTopologyInitializer(
         if (configs.Count == 0)
             throw new InvalidOperationException("No RabbitMQ configurations found.");
 
-        var mainConfig = configs.First();
 
-        // Exchange principale
-        await builder.DeclareExchangeAsync(mainConfig.Exchange, mainConfig.ExchangeType);
-
-        foreach (var conf in configs)
+        foreach (var config in configs)
         {
-            // Coda principale
-            var mainQueueArgs = new Dictionary<string, object?>();
 
-            if (!string.IsNullOrWhiteSpace(conf.DeadLetterExchange))
+            // Exchange principale
+            await builder.DeclareExchangeAsync(config.Exchange, config.ExchangeType);
+
+            // Retry exchange
+            if (!string.IsNullOrWhiteSpace(config.RetryExchange))
+                await builder.DeclareExchangeAsync(config.RetryExchange, config.RetryExchangeType ?? "fanout");
+
+            // Dead letter exchange
+            if (!string.IsNullOrWhiteSpace(config.DeadLetterExchange))
+                await builder.DeclareExchangeAsync(config.DeadLetterExchange, config.DeadLetterExchangeType ?? "fanout");
+
+            // Coda principale (con eventuale DLX)
+            var mainQueueArgs = BuildMainQueueArguments(config.DeadLetterExchange, config.Exchange);
+            await builder.DeclareQueueAsync(config.Queue, mainQueueArgs);
+
+            // Binding delle routing key principali
+            foreach (var binding in config.Bindings)
             {
-                mainQueueArgs["x-dead-letter-exchange"] = conf.DeadLetterExchange;
-                mainQueueArgs["x-dead-letter-routing-key"] = conf.Bindings.FirstOrDefault()?.RoutingKey ?? "";
+                await builder.BindQueueAsync(config.Queue, config.Exchange, binding.RoutingKey);
             }
-            await builder.DeclareQueueAsync(conf.Queue, mainQueueArgs);
 
-            foreach (var binding in conf.Bindings)
+            // Se non c'è una coda di retry allora il binding non serve
+            if (!string.IsNullOrWhiteSpace(config.RetryQueue))
             {
-                // Binding queue principale su tutte le routing key
-                await builder.BindQueueAsync(
-                    conf.Queue,
-                    mainConfig.Exchange,
-                    binding.RoutingKey
-                );
+                var retryQueueArgs = BuildRetryQueueArguments(config.DeadLetterExchange, config.Exchange);
 
-                // Coda retry (una sola, TTL nel messaggio)
-                if (conf.RetryQueue is not null && binding.Retry is not null)
+                await builder.DeclareQueueAsync(config.RetryQueue, retryQueueArgs);
+
+                // RetryExchange se definito, altrimenti fallback su Exchange principale
+                var retryExchange = config.RetryExchange ?? config.Exchange;
+
+                foreach (var binding in config.Bindings)
                 {
-                    var args = new Dictionary<string, object?>
-                    {
-                        ["x-dead-letter-exchange"] = mainConfig.Exchange
-                    };
+                    if (binding.Retry is null)
+                        continue;
 
-                    await builder.DeclareQueueAsync(conf.RetryQueue, args);
-
-                    if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
-                    {
-                        await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
-                        await builder.BindQueueAsync(conf.RetryQueue, conf.RetryExchange);
-                    }
+                    await builder.BindQueueAsync(config.RetryQueue, retryExchange, binding.RoutingKey);
                 }
             }
 
-            // DLQ
-            if (conf.DeadLetterQueue is not null && conf.DeadLetterExchange is not null)
+            // Dead-letter queue 
+            if (!string.IsNullOrWhiteSpace(config.DeadLetterQueue))
             {
-                await builder.DeclareExchangeAsync(conf.DeadLetterExchange, conf.DeadLetterExchangeType ?? "fanout");
-                await builder.DeclareQueueAsync(conf.DeadLetterQueue);
-                await builder.BindQueueAsync(conf.DeadLetterQueue, conf.DeadLetterExchange);
+                // Usa DLX se specificato, altrimenti l’exchange principale
+                var deadLetterExchange = config.DeadLetterExchange ?? config.Exchange;
+
+                await builder.DeclareQueueAsync(config.DeadLetterQueue);
+                await builder.BindQueueAsync(config.DeadLetterQueue, deadLetterExchange);
             }
         }
 
@@ -76,4 +79,31 @@ internal sealed class RabbitMQTopologyInitializer(
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    // Helper: main queue args (senza routing key)
+    private static Dictionary<string, object?> BuildMainQueueArguments(string? deadLetterExchange, string fallbackExchange)
+    {
+        var args = new Dictionary<string, object?>();
+
+        var exchange = !string.IsNullOrWhiteSpace(deadLetterExchange)
+            ? deadLetterExchange
+            : fallbackExchange;
+
+        args["x-dead-letter-exchange"] = exchange;
+
+        return args;
+    }
+
+    // Helper: retry queue args (con DLX e routing key)
+    private static Dictionary<string, object?> BuildRetryQueueArguments(string? deadLetterExchange, string fallbackExchange)
+    {
+        var exchange = !string.IsNullOrWhiteSpace(deadLetterExchange)
+            ? deadLetterExchange
+            : fallbackExchange;
+
+        return new()
+        {
+            ["x-dead-letter-exchange"] = exchange
+        };
+    }
 }
