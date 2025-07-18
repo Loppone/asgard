@@ -214,6 +214,14 @@ public sealed class CloudEventDispatcherTests
     private sealed class TestMapper : ICloudEventTypeMapper
     {
         private readonly Dictionary<string, Type> _map = [];
+        private readonly Dictionary<Type, string> _reverseMap = [];
+
+        public string? GetTypeName(Type type)
+        {
+            ArgumentNullException.ThrowIfNull(type);
+
+            return _reverseMap.TryGetValue(type, out var typeName) ? typeName : null;
+        }
 
         public void Register<T>(string typeName)
         {
@@ -223,6 +231,7 @@ public sealed class CloudEventDispatcherTests
         public Type? Resolve(string cloudEventType)
         {
             _map.TryGetValue(cloudEventType, out var type);
+
             return type;
         }
     }

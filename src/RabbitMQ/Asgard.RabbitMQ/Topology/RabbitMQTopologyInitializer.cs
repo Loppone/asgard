@@ -1,11 +1,14 @@
-﻿namespace Asgard.RabbitMQ.Topology;
+﻿using Asgard.RabbitMQ.Internal;
+
+namespace Asgard.RabbitMQ.Topology;
 
 /// <summary>
 /// Servizio avviato a runtime che legge la configurazione e crea la topologia RabbitMQ.
 /// </summary>
 internal sealed class RabbitMQTopologyInitializer(
     IRabbitMQTopologyBuilder builder,
-    IOptions<RabbitMQSubscriptionOptions> subscriptionOptions)
+    IOptions<RabbitMQSubscriptionOptions> subscriptionOptions,
+    RabbitMQStartupSynchronizer synchronizer)
     : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -67,6 +70,9 @@ internal sealed class RabbitMQTopologyInitializer(
                 await builder.BindQueueAsync(conf.DeadLetterQueue, conf.DeadLetterExchange);
             }
         }
+
+        // Segnala che la topologia è pronta
+        synchronizer.SignalTopologyReady();
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

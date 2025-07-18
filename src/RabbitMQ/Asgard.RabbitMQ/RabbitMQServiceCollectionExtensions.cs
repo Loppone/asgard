@@ -1,4 +1,5 @@
-﻿using RabbitMQClient = RabbitMQ.Client;
+﻿using Asgard.RabbitMQ.Internal;
+using RabbitMQClient = RabbitMQ.Client;
 
 namespace Asgard.RabbitMQ;
 
@@ -47,13 +48,15 @@ public static class RabbitMQServiceCollectionExtensions
 
     private static void RegisterCoreServices(IServiceCollection services)
     {
+        services.AddSingleton<RabbitMQStartupSynchronizer>();
+
+        services.AddSingleton<IHostedService, RabbitMQTopologyInitializer>();
+        services.AddSingleton<IRabbitMQTopologyBuilder, RabbitMQTopologyBuilder>();
+        
         services.AddSingleton<IEventPublisher, RabbitPublisher>();
 
         services.AddSingleton<IEventSubscriber, RabbitEventSubscriber>();
         services.AddHostedService<RabbitEventSubscriberHostedService>();
-
-        services.AddSingleton<IHostedService, RabbitMQTopologyInitializer>();
-        services.AddSingleton<IRabbitMQTopologyBuilder, RabbitMQTopologyBuilder>();
 
         services.TryAddSingleton<ICloudEventSerializer, CloudEventJsonSerializer>();
         services.AddSingleton<IValidateOptions<RabbitMQSubscriptionOptions>, RabbitMQSubscriptionOptionsValidation>();

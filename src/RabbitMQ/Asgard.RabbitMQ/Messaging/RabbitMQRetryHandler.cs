@@ -96,9 +96,9 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         );
 
         // Ack del messaggio originale
-        //await channel.BasicAckAsync(args.DeliveryTag, false, cancellationToken);
+        await channel.BasicAckAsync(args.DeliveryTag, false, cancellationToken);
 
-        await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, cancellationToken);
+        //await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, cancellationToken);
 
     }
 }
