@@ -28,10 +28,8 @@ internal sealed class RabbitPublisher(
             DeliveryMode = DeliveryModes.Persistent,
         };
 
-        // Routing key se presente nel CloudEvent.Extensions (o vuota se non c'è)
-        var routingKey = cloudEvent.Extensions?.TryGetValue("routingKey", out var rk) == true
-            ? rk as string ?? string.Empty
-            : string.Empty;
+        // Routing key se presente nel CloudEvent.Type (o vuota se non c'è)
+        var routingKey = cloudEvent.Type ?? string.Empty;
 
         await channel.BasicPublishAsync(
             exchange: _config.Exchange,
@@ -57,15 +55,6 @@ internal sealed class RabbitPublisher(
             throw new ArgumentException("The 'Source' field in CloudEventOptions must be provided.", nameof(options));
 
         var cloudEvent = CloudEvent.Create(payload, type, options.Source, options.ContentType);
-
-        if (!string.IsNullOrWhiteSpace(routingKey))
-        {
-            var ext = new Dictionary<string, object>(cloudEvent.Extensions ?? new Dictionary<string, object>())
-            {
-                ["routingKey"] = routingKey
-            };
-            cloudEvent = cloudEvent with { Extensions = ext };
-        }
 
         await PublishAsync(cloudEvent, cancellationToken);
     }

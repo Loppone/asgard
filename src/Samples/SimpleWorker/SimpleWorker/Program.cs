@@ -6,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 using Asgard.Abstraction.Messaging.Handlers;
 using SimpleWorker;
 using Asgard.Abstraction.Events;
-using Microsoft.Extensions.Options;
 using Asgard.Abstraction.Messaging.Dispatchers;
 using Asgard.RabbitMQ.Messaging;
 
@@ -33,6 +32,8 @@ internal class Program
 
         var app = builder.Build();
         await app.StartAsync();
+
+        Console.Clear();
 
         // Simula una pubblicazione all'avvio
         var publisher = app.Services.GetRequiredService<IEventPublisher>();

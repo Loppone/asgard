@@ -1,0 +1,15 @@
+﻿// Esempio di json da utilizzare dalla console di RabbitMQ per testare l'invio di un evento
+
+{
+	"SpecVersion": "1.0",
+	"Id": "7cf2c7e5-1b79-4ffa-bb01-8424fbb3c1be",
+	"Type": "asgard",	<-------------------------------- Routing Key!
+	"Source": "sample-app",
+	"Subject": null,
+	"Time": "2025-07-18T08:46:58.1629754+00:00",
+	"DataContentType": "application/json",
+	"Data": {
+		"UserId": "f22dc95b-b682-418e-ba87-7b4023483153",
+		"Email": "sti@cazzi.com"
+	}
+}

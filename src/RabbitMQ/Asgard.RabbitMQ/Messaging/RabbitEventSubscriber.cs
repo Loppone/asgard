@@ -1,4 +1,6 @@
-﻿namespace Asgard.RabbitMQ.Messaging;
+﻿using System.Text;
+
+namespace Asgard.RabbitMQ.Messaging;
 
 /// <summary>
 /// Subscriber che riceve messaggi RabbitMQ serializzati come CloudEvent,
@@ -26,6 +28,8 @@ internal sealed class RabbitEventSubscriber(
             try
             {
                 var json = JsonSerializer.Deserialize<JsonElement>(ea.Body.Span);
+
+                var jsonString = Encoding.UTF8.GetString(ea.Body.Span);
 
                 var cloudEvent = serializer.Deserialize(json, typeof(CloudEvent)) as CloudEvent
                     ?? throw new InvalidOperationException("Failed to deserialize CloudEvent.");

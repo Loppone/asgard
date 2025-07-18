@@ -6,9 +6,7 @@ public sealed class UserCreatedHandler : ICloudEventHandler<UserCreated>
 {
     public Task HandleAsync(UserCreated message, CancellationToken ct)
     {
-        Console.Clear();
-
-        Console.WriteLine($"User created: {message.Email}");
+        Console.WriteLine($"User created: {message.Email} at {DateTime.Now}");
 
         return Task.CompletedTask;
     }
