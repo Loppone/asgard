@@ -6,17 +6,20 @@
 /// </summary>
 public class RabbitMQConfiguration
 {
+    // Main
     public string Queue { get; set; } = default!;
-
     public string Exchange { get; set; } = default!;
     public string ExchangeType { get; set; } = "fanout";
 
+    // Retry
+    public string? RetryQueue { get; set; }
     public string? RetryExchange { get; set; }
     public string? RetryExchangeType { get; set; } = "fanout";
 
+    // Dead Letter
+    public string? DeadLetterQueue { get; set; }
     public string? DeadLetterExchange { get; set; }
     public string? DeadLetterExchangeType { get; set; } = "fanout";
-    public string? DeadLetterQueue { get; set; }
 
     /// <summary>
     /// Configurazioni per ciascuna routing key associata a questa coda.
@@ -36,8 +39,6 @@ public class RoutingKeyBinding
     /// </summary>
     public string? RoutingKey { get; set; }
 
-    public string? RetryQueue { get; set; }
-
     /// <summary>
     /// Impostazioni per il retry specifiche di questa routing key.
     /// </summary>
@@ -50,7 +51,7 @@ public class RoutingKeyBinding
 /// </summary>
 public class RetrySettings
 {
-    public int MaxRetries { get; set; } = 3;
+    public int MaxRetries { get; set; }
 
     /// <summary>
     /// Delay (in secondi) tra un retry e l’altro. 

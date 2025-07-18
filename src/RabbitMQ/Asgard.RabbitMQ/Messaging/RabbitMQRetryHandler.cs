@@ -22,7 +22,7 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         var retryConfig = config.Bindings.FirstOrDefault(b => b.RoutingKey == routingKey)
                        ?? config.Bindings.FirstOrDefault(b => b.RoutingKey is null);
 
-        if (retryConfig is null || retryConfig.Retry is null || string.IsNullOrWhiteSpace(retryConfig.RetryQueue))
+        if (retryConfig is null || retryConfig.Retry is null || string.IsNullOrWhiteSpace(config.RetryQueue))
         {
             // Nessuna configurazione valida, manda direttamente in DLQ
             await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
@@ -43,7 +43,7 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
         if (xDeath is [var entryRaw] && entryRaw is Dictionary<string, object> entry)
         {
             if (entry.TryGetValue("queue", out var queueObj) &&
-                Encoding.UTF8.GetString((byte[])queueObj) == retryConfig.RetryQueue &&
+                Encoding.UTF8.GetString((byte[])queueObj) == config.RetryQueue &&
                 entry.TryGetValue("count", out var countObj))
             {
                 retryCount = Convert.ToInt32(countObj);

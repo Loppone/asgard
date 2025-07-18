@@ -42,19 +42,19 @@ internal sealed class RabbitMQTopologyInitializer(
                 );
 
                 // Coda retry (una sola, TTL nel messaggio)
-                if (binding.RetryQueue is not null && binding.Retry is not null)
+                if (conf.RetryQueue is not null && binding.Retry is not null)
                 {
                     var args = new Dictionary<string, object?>
                     {
                         ["x-dead-letter-exchange"] = mainConfig.Exchange
                     };
 
-                    await builder.DeclareQueueAsync(binding.RetryQueue, args);
+                    await builder.DeclareQueueAsync(conf.RetryQueue, args);
 
                     if (!string.IsNullOrWhiteSpace(conf.RetryExchange))
                     {
                         await builder.DeclareExchangeAsync(conf.RetryExchange, conf.RetryExchangeType ?? "fanout");
-                        await builder.BindQueueAsync(binding.RetryQueue, conf.RetryExchange);
+                        await builder.BindQueueAsync(conf.RetryQueue, conf.RetryExchange);
                     }
                 }
             }

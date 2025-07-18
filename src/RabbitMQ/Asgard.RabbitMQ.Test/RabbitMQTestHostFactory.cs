@@ -33,12 +33,12 @@ public static class RabbitMQTestHostFactory
             DeadLetterExchange = "ex.asgard-dead",
             Queue = "queue.asgard-main",
             DeadLetterQueue = "queue.asgard-dead",
+            RetryQueue = "queue.asgard-retry.rk.test",
             Bindings =
             [
                 new()
                 {
                     RoutingKey = "rk.test",
-                    RetryQueue = "queue.asgard-retry.rk.test",
                     Retry = new RetrySettings
                     {
                         MaxRetries = 2,

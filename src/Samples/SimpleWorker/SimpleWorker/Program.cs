@@ -6,7 +6,6 @@ using Microsoft.Extensions.Configuration;
 using Asgard.Abstraction.Messaging.Handlers;
 using SimpleWorker;
 using Asgard.Abstraction.Events;
-using Microsoft.Extensions.Options;
 
 internal class Program
 {

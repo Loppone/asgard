@@ -271,11 +271,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             DeadLetterExchange = "ex.no-routingkey-dead",
             Queue = "queue.no-routingkey",
             DeadLetterQueue = "queue.no-routingkey-dead",
+            RetryQueue = "queue.no-routingkey-retry",
             Bindings =
             [
                 new()
             {
-                RetryQueue = "queue.no-routingkey-retry",
                 Retry = new RetrySettings
                 {
                     MaxRetries = 1,
@@ -350,11 +350,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             DeadLetterExchange = "ex.no-routingkey-dead",
             Queue = "queue.no-routingkey",
             DeadLetterQueue = "queue.no-routingkey-dead",
+            RetryQueue = "queue.no-routingkey-retry",
             Bindings =
             [
                 new()
             {
-                RetryQueue = "queue.no-routingkey-retry",
                 Retry = new RetrySettings
                 {
                     MaxRetries = 2,
@@ -450,11 +450,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             DeadLetterExchange = "ex.shared.dead",
             Queue = "queue.shared.main",
             DeadLetterQueue = "queue.shared.dead",
+            RetryQueue = "queue.shared.retry",
             Bindings =
             [
                 new()
                 {
-                    RetryQueue = "queue.shared.retry",
                     RoutingKey = "rk.alpha",
                     Retry = new RetrySettings
                     {
@@ -465,7 +465,6 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                 },
                 new()
                 {
-                    RetryQueue = "queue.shared.retry",
                     RoutingKey = "rk.beta",
                     Retry = new RetrySettings
                     {
