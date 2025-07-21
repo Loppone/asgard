@@ -6,20 +6,28 @@
 /// </summary>
 public class RabbitMQConfiguration
 {
-    // Main
+    // Main Queue
     public string Queue { get; set; } = default!;
+    public IDictionary<string, object?>? QueueArguments { get; set; }
+
+    // Main Exchange
     public string Exchange { get; set; } = default!;
     public string ExchangeType { get; set; } = "fanout";
+    public IDictionary<string, object?>? ExchangeArguments { get; set; }
 
     // Retry
     public string? RetryQueue { get; set; }
+    public IDictionary<string, object?>? RetryQueueArguments { get; set; }
     public string? RetryExchange { get; set; }
     public string? RetryExchangeType { get; set; } = "fanout";
+    public IDictionary<string, object?>? RetryExchangeArguments { get; set; }
 
     // Dead Letter
     public string? DeadLetterQueue { get; set; }
+    public IDictionary<string, object?>? DeadLetterQueueArguments { get; set; }
     public string? DeadLetterExchange { get; set; }
     public string? DeadLetterExchangeType { get; set; } = "fanout";
+    public IDictionary<string, object?>? DeadLetterExchangeArguments { get; set; }
 
     /// <summary>
     /// Configurazioni per ciascuna routing key associata a questa coda.
@@ -34,6 +42,11 @@ public class RabbitMQConfiguration
 /// </summary>
 public class RoutingKeyBinding
 {
+    /// <summary>
+    /// Chiave logica che rappresenta il tipo di messaggio (usata dall'applicazione)
+    /// </summary>
+    public string? Key { get; set; } = default!;
+
     /// <summary>
     /// Routing key associata. Se null, si assume gestione "senza routing key".
     /// </summary>

@@ -16,19 +16,7 @@ public interface IEventPublisher
     /// <param name="cloudEvent">Evento conforme al formato CloudEvent.</param>
     /// <param name="cancellationToken">Token di cancellazione.</param>
     Task PublishAsync(
-        CloudEvent cloudEvent, 
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Costruisce e pubblica un evento a partire da un payload tipizzato.
-    /// I metadati vengono configurati tramite <see cref="CloudEventOptions"/>.
-    /// </summary>
-    /// <param name="payload">Oggetto da serializzare nel campo <c>data</c>.</param>
-    /// <param name="options">Metadati CloudEvent (type, source, subject, ecc.).</param>
-    /// <param name="cancellationToken">Token di cancellazione.</param>
-    Task PublishAsync<TPayload>(
-        TPayload payload, 
-        CloudEventOptions options,
-        string? routingKey = null,
+        CloudEvent cloudEvent,
+        string? bindingKey = null,
         CancellationToken cancellationToken = default);
 }

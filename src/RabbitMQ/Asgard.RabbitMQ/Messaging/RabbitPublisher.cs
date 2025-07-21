@@ -8,14 +8,16 @@ internal sealed class RabbitPublisher(
     IConnectionFactory connectionFactory,
     IOptions<RabbitMQOptions> options,
     IOptions<RabbitMQSubscriptionOptions> subscriptionOptions,
-    ICloudEventTypeMapper typeMapper,
     ICloudEventSerializer serializer) : IEventPublisher
 {
     private readonly RabbitMQConfiguration _config = subscriptionOptions.Value.Configurations
         .FirstOrDefault() ??
             throw new InvalidOperationException("No RabbitMQConfiguration was found. Please ensure at least one configuration is registered.");
 
-    public async Task PublishAsync(CloudEvent cloudEvent, CancellationToken cancellationToken = default)
+    public async Task PublishAsync(
+        CloudEvent cloudEvent,
+        string? bindingKey = null,
+        CancellationToken cancellationToken = default)
     {
         var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName, cancellationToken);
         await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
@@ -28,8 +30,7 @@ internal sealed class RabbitPublisher(
             DeliveryMode = DeliveryModes.Persistent,
         };
 
-        // Routing key se presente nel CloudEvent.Type (o vuota se non c'è)
-        var routingKey = cloudEvent.Type ?? string.Empty;
+        var routingKey = ResolveRoutingKey(bindingKey);
 
         await channel.BasicPublishAsync(
             exchange: _config.Exchange,
@@ -41,21 +42,18 @@ internal sealed class RabbitPublisher(
         );
     }
 
-    public async Task PublishAsync<TPayload>(
-    TPayload payload,
-    CloudEventOptions options,
-    string? routingKey = null,
-    CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Risolve la routing key in base alla bindingKey specificata.
+    /// Se nulla, ritorna string.Empty (es. exchange fanout).
+    /// </summary>
+    private string? ResolveRoutingKey(string? bindingKey)
     {
-        var type = typeMapper.GetTypeName(typeof(TPayload))
-            ?? throw new InvalidOperationException(
-                $"Missing CloudEvent type mapping for {typeof(TPayload).FullName}");
+        if (bindingKey is null)
+            return null!;
 
-        if (string.IsNullOrWhiteSpace(options.Source))
-            throw new ArgumentException("The 'Source' field in CloudEventOptions must be provided.", nameof(options));
+        var binding = _config.Bindings.FirstOrDefault(b => b.Key == bindingKey)
+            ?? throw new InvalidOperationException($"No binding found for key '{bindingKey}'");
 
-        var cloudEvent = CloudEvent.Create(payload, type, options.Source, options.ContentType);
-
-        await PublishAsync(cloudEvent, cancellationToken);
+        return binding.RoutingKey ?? string.Empty;
     }
 }

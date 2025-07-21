@@ -6,7 +6,7 @@
 /// </summary>
 internal interface IRabbitMQTopologyBuilder
 {
-    Task DeclareExchangeAsync(string name, string type, bool durable = true);
+    Task DeclareExchangeAsync(string name, string type, IDictionary<string, object?>? arguments = null);
 
     Task DeclareQueueAsync(string queueName, IDictionary<string, object?>? arguments = null);
 

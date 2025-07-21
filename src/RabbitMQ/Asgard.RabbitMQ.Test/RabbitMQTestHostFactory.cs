@@ -38,7 +38,8 @@ public static class RabbitMQTestHostFactory
             [
                 new()
                 {
-                    RoutingKey = "rk.test",
+                    Key = "failing",
+                    RoutingKey = "asgard-test",
                     Retry = new RetrySettings
                     {
                         MaxRetries = 2,

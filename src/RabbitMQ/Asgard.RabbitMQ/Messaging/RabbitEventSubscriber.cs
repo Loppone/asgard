@@ -38,8 +38,9 @@ internal sealed class RabbitEventSubscriber(
 
                 await channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             }
-            catch
+            catch(Exception ex)
             {
+                Console.WriteLine($"[RabbitEventSubscriber] Error processing message: {ex.Message}");
                 await retryHandler.HandleRetryAsync(channel, ea, configuation, cancellationToken);
             }
 

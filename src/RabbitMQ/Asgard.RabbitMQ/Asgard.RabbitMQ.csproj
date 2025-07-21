@@ -7,7 +7,7 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		
 		<PackageId>DoggoLabs.Asgard.RabbitMQ</PackageId>
-		<Version>1.0.1</Version>
+		<Version>1.0.2</Version>
 		<Authors>Maximiliano Bertoli</Authors>
 		<Company>DoggoLabs</Company>
 		<Description>

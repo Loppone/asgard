@@ -8,7 +8,7 @@ internal sealed class RabbitMQTopologyBuilder(
     IOptions<RabbitMQOptions> options) 
     : IRabbitMQTopologyBuilder
 {
-    public async Task DeclareExchangeAsync(string exchange, string type, bool durable = true)
+    public async Task DeclareExchangeAsync(string exchange, string type, IDictionary<string, object?>? arguments = null)
     {
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();
@@ -16,9 +16,9 @@ internal sealed class RabbitMQTopologyBuilder(
         await channel.ExchangeDeclareAsync(
             exchange: exchange,
             type: type,
-            durable: durable,
+            durable: true,
             autoDelete: false,
-            arguments: null);
+            arguments: arguments);
     }
 
     public async Task DeclareQueueAsync(string queue, IDictionary<string, object?>? arguments = null)

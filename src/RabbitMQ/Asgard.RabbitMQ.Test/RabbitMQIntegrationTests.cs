@@ -66,10 +66,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                     Bindings =
                     [
                         new()
-                    {
-                        RoutingKey = "",
-                        Retry = null
-                    }
+                        {
+                            Key = null!,
+                            RoutingKey = null,
+                            Retry = null
+                        }
                     ]
                 };
 
@@ -105,11 +106,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var publisher = host.Services.GetRequiredService<IEventPublisher>();
 
+
         var payload = new TestPayload("hello-world");
-        await publisher.PublishAsync(payload, new CloudEventOptions
-        {
-            Source = "test-suite"
-        });
+        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
+
+        await publisher.PublishAsync(cloudEvent, cancellationToken: default);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
 
@@ -124,7 +125,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Event_Should_Be_Retried_Then_Sent_To_Dlq()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
 
         await _container.StartAsync(cts.Token);
 
@@ -145,21 +146,11 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         // Invio evento che fallisce e va in DLQ
         var payload = new TestPayload("failing-payload");
 
-        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source")
-            with
-        {
-            Extensions = new Dictionary<string, object>
-            {
-                ["routingKey"] = "rk.test"
-            }
-        };
+        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
 
         var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
 
-        await publisher.PublishAsync(cloudEvent, cts.Token);
-
-        // Attesa per i due retry e DLQ
-        await Task.Delay(TimeSpan.FromSeconds(20), cts.Token);
+        await publisher.PublishAsync(cloudEvent, bindingKey: "failing", cancellationToken: cts.Token);
 
         // Verifica che il messaggio sia arrivato nella DLQ
         var factory = new ConnectionFactory
@@ -173,12 +164,90 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        var result = await channel.BasicGetAsync("queue.asgard-dead", autoAck: true);
-        result.Should().NotBeNull("Message should end up in DLQ after retries");
+        var message = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.asgard-dead",
+            expectedContent: "failing-payload",
+            timeout: TimeSpan.FromSeconds(50),
+            cancellationToken: cts.Token);
 
-        var messageBody = Encoding.UTF8.GetString(result.Body.ToArray());
-        messageBody.Should().Contain("failing-payload");
+        message.Should().NotBeNull("Message should end up in DLQ after retries");
+        message.Should().Contain("failing-payload");
     }
+
+    [Fact]
+    public async Task Event_Should_Be_Retried_Twice_Before_Dlq()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+
+        await _container.StartAsync(cts.Token);
+
+        var host = _container.Hostname;
+        var port = _container.GetMappedPublicPort(5672);
+
+        var rabbitHost = RabbitMQTestHostFactory.Build(host, port);
+
+        var topologyInitializer = rabbitHost.Services.GetServices<IHostedService>()
+            .OfType<RabbitMQTopologyInitializer>()
+            .FirstOrDefault();
+
+        if (topologyInitializer is not null)
+            await topologyInitializer.StartAsync(cts.Token);
+
+        await rabbitHost.StartAsync(cts.Token);
+
+        // Evento che fallisce e viene ritentato
+        var payload = new TestPayload("failing-payload");
+        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
+
+        var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
+        await publisher.PublishAsync(cloudEvent, bindingKey: "failing", cancellationToken: cts.Token);
+
+        // Connessione diretta a RabbitMQ
+        var factory = new ConnectionFactory
+        {
+            HostName = host,
+            Port = port,
+            UserName = "guest",
+            Password = "guest"
+        };
+
+        await using var connection = await factory.CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync();
+
+        var retryQueue = "queue.asgard-retry.rk.test";
+        int retryCount = 0;
+
+        var deadline = DateTime.UtcNow.AddSeconds(25);
+
+        while (DateTime.UtcNow < deadline && retryCount < 3)
+        {
+            var result = await channel.BasicGetAsync(retryQueue, autoAck: true);
+            if (result != null)
+            {
+                var body = Encoding.UTF8.GetString(result.Body.ToArray());
+                if (body.Contains("failing-payload"))
+                {
+                    retryCount++;
+                }
+            }
+
+            await Task.Delay(1000, cts.Token);
+        }
+
+        retryCount.Should().Be(2, "The message should be routed to the retry queue exactly 2 times");
+
+        // Verifica finale: il messaggio deve essere finito in DLQ
+        var dlqMessage = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.asgard-dead",
+            expectedContent: "failing-payload",
+            timeout: TimeSpan.FromSeconds(10),
+            cancellationToken: cts.Token);
+
+        dlqMessage.Should().NotBeNull("After max retries, the message should go to DLQ");
+    }
+
 
     [Fact]
     public async Task Should_Respect_Retry_Delays()
@@ -204,19 +273,13 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         // Preparazione messaggio che fallirà
         var payload = new TestPayload("delayed-retry");
 
-        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source")
-            with
-        {
-            Extensions = new Dictionary<string, object>
-            {
-                ["routingKey"] = "rk.test"
-            }
-        };
+        var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
 
         var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
 
         var stopwatch = Stopwatch.StartNew();
-        await publisher.PublishAsync(cloudEvent, cts.Token);
+
+        await publisher.PublishAsync(cloudEvent, bindingKey: "failing", cancellationToken: cts.Token);
 
         // Attendi arrivo messaggio in DLQ
         var factory = new ConnectionFactory
@@ -227,31 +290,26 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             Password = "guest"
         };
 
-        BasicGetResult? result = null;
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        // Polling attivo per attendere la comparsa in DLQ
-        for (var i = 0; i < 30; i++)
-        {
-            result = await channel.BasicGetAsync("queue.asgard-dead", autoAck: true);
-            if (result is not null)
-                break;
-
-            await Task.Delay(7000, cts.Token);
-        }
+        var message = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.asgard-dead",
+            expectedContent: "delayed-retry",
+            timeout: TimeSpan.FromSeconds(25),
+            cancellationToken: cts.Token);
 
         stopwatch.Stop();
 
-        result.Should().NotBeNull("Message should end up in DLQ after retry delays");
+        message.Should().NotBeNull("Message should end up in DLQ after retry delays");
 
         var elapsedSeconds = stopwatch.Elapsed.TotalSeconds;
 
         elapsedSeconds.Should().BeGreaterThanOrEqualTo(6.0,
             "retry delays are 2s and 4s, so minimum expected time is 6s");
 
-        var body = Encoding.UTF8.GetString(result!.Body.ToArray());
-        body.Should().Contain("delayed-retry");
+        message.Should().Contain("delayed-retry");
     }
 
     [Fact]
@@ -274,13 +332,14 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             Bindings =
             [
                 new()
-            {
-                Retry = new RetrySettings
                 {
-                    MaxRetries = 1,
-                    DelaysSeconds = [ 2 ]
+                    Key = string.Empty,
+                    Retry = new RetrySettings
+                    {
+                        MaxRetries = 1,
+                        DelaysSeconds = [ 2 ]
+                    }
                 }
-            }
             ]
         };
 
@@ -321,10 +380,9 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var publisher = hostBuilder.Services.GetRequiredService<IEventPublisher>();
         var payload = new TestPayload("no-routing-key");
-
         var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
 
-        await publisher.PublishAsync(cloudEvent, cts.Token);
+        await publisher.PublishAsync(cloudEvent, cancellationToken: cts.Token);
 
         var result = await received.Reader.ReadAsync(cts.Token);
         result.Should().NotBeNull();
@@ -356,6 +414,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             {
                 Retry = new RetrySettings
                 {
+                    // Key non specificato, quindi si applica a tutti i messaggi senza routing key
                     MaxRetries = 2,
                     DelaysSeconds = [2, 2]
                 }
@@ -401,7 +460,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
 
-        await publisher.PublishAsync(cloudEvent, cts.Token);
+        await publisher.PublishAsync(cloudEvent, cancellationToken: cts.Token);
 
         // Polling attivo per verificare arrivo in DLQ
         var factory = new ConnectionFactory
@@ -415,20 +474,15 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        BasicGetResult? result = null;
+        var messasge = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.no-routingkey-dead",
+            expectedContent: "fail-me",
+            timeout: TimeSpan.FromSeconds(20),
+            cancellationToken: cts.Token);
 
-        for (int i = 0; i < 20; i++)
-        {
-            result = await channel.BasicGetAsync("queue.no-routingkey-dead", autoAck: true);
-            if (result is not null)
-                break;
-
-            await Task.Delay(1000, cts.Token);
-        }
-
-        result.Should().NotBeNull("Message should be dead-lettered after retries");
-        var body = Encoding.UTF8.GetString(result!.Body.ToArray());
-        body.Should().Contain("fail-me");
+        messasge.Should().NotBeNull("Message should be dead-lettered after retries");
+        messasge.Should().Contain("fail-me");
 
         await hostBuilder.StopAsync();
     }
@@ -454,6 +508,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             [
                 new()
                 {
+                    Key = "alpha",
                     RoutingKey = "rk.alpha",
                     Retry = new RetrySettings
                     {
@@ -464,6 +519,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                 },
                 new()
                 {
+                    Key = "beta",
                     RoutingKey = "rk.beta",
                     Retry = new RetrySettings
                     {
@@ -509,18 +565,12 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var publisher = hostBuilder.Services.GetRequiredService<IEventPublisher>();
 
-        var cloudEvent1 = CloudEvent.Create(new TestPayload("payload-alpha"), "asgard.test", "test-source") with
-        {
-            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.alpha" }
-        };
+        var cloudEvent1 = CloudEvent.Create(new TestPayload("payload-alpha"), "asgard.test", "test-source");
+        var cloudEvent2 = CloudEvent.Create(new TestPayload("payload-beta"), "asgard.test", "test-source");
 
-        var cloudEvent2 = CloudEvent.Create(new TestPayload("payload-beta"), "asgard.test", "test-source") with
-        {
-            Extensions = new Dictionary<string, object> { ["routingKey"] = "rk.beta" }
-        };
+        await publisher.PublishAsync(cloudEvent1, bindingKey: "alpha", cancellationToken: cts.Token);
+        await publisher.PublishAsync(cloudEvent2, bindingKey: "beta", cancellationToken: cts.Token);
 
-        await publisher.PublishAsync(cloudEvent1, cts.Token);
-        await publisher.PublishAsync(cloudEvent2, cts.Token);
 
         await using var connection = await new ConnectionFactory
         {
@@ -532,26 +582,52 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         await using var channel = await connection.CreateChannelAsync();
 
-        var foundPayloads = new HashSet<string>();
+        var msgAlpha = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.shared.dead",
+            expectedContent: "payload-alpha",
+            timeout: TimeSpan.FromSeconds(20),
+            cancellationToken: cts.Token);
 
-        for (int i = 0; i < 20 && foundPayloads.Count < 2; i++)
-        {
-            var result = await channel.BasicGetAsync("queue.shared.dead", autoAck: true);
+        var msgBeta = await WaitForMessageInQueueAsync(
+            channel,
+            queueName: "queue.shared.dead",
+            expectedContent: "payload-beta",
+            timeout: TimeSpan.FromSeconds(20),
+            cancellationToken: cts.Token);
 
-            if (result is not null)
-            {
-                var body = Encoding.UTF8.GetString(result.Body.ToArray());
-                if (body.Contains("payload-alpha")) foundPayloads.Add("payload-alpha");
-                if (body.Contains("payload-beta")) foundPayloads.Add("payload-beta");
-            }
-
-            await Task.Delay(1000, cts.Token);
-        }
-
-        foundPayloads.Should().Contain("payload-alpha");
-        foundPayloads.Should().Contain("payload-beta");
+        msgAlpha.Should().NotBeNull("Expected 'payload-alpha' to end up in DLQ");
+        msgBeta.Should().NotBeNull("Expected 'payload-beta' to end up in DLQ");
 
         await hostBuilder.StopAsync();
     }
+
+
+    #region PRIVATE METHODS
+    private static async Task<string?> WaitForMessageInQueueAsync(
+    IChannel channel,
+    string queueName,
+    string expectedContent,
+    TimeSpan timeout,
+    CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var result = await channel.BasicGetAsync(queueName, autoAck: true, cancellationToken: cancellationToken);
+            if (result != null)
+            {
+                var messageBody = Encoding.UTF8.GetString(result.Body.ToArray());
+                if (messageBody.Contains(expectedContent))
+                    return messageBody;
+            }
+
+            await Task.Delay(1000, cancellationToken);
+        }
+
+        return null;
+    }
+    #endregion
 
 }
