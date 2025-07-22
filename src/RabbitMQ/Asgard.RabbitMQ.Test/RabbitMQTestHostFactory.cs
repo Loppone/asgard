@@ -28,22 +28,47 @@ public static class RabbitMQTestHostFactory
 
         var rabbitConfig = new RabbitMQConfiguration
         {
-            Exchange = "ex.asgard-test",
-            RetryExchange = "ex.asgard-retry",
-            DeadLetterExchange = "ex.asgard-dead",
-            Queue = "queue.asgard-main",
-            DeadLetterQueue = "queue.asgard-dead",
-            RetryQueue = "queue.asgard-retry.rk.test",
+            Exchange = "ex.main",
+            ExchangeType = "direct",
+            ExchangeArguments = new Dictionary<string, object?>
+            {
+                ["alternate-exchange"] = "ex.dead"
+            },
+            Queue = "queue.main",
+            QueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.dead",
+                ["x-queue-type"] = "quorum"
+            },
+
+            RetryExchange = "ex.retry",
+            RetryExchangeType = "fanout",
+            RetryQueue = "queue.retry",
+            RetryQueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.main",
+                ["x-queue-type"] = "quorum",
+                ["x-dead-letter-routing-key"] = "asgard.test",
+            },
+
+            DeadLetterExchange = "ex.dead",
+            DeadLetterExchangeType = "fanout",
+            DeadLetterQueue = "queue.dead",
+            DeadLetterExchangeArguments = new Dictionary<string, object?>
+            {
+                ["x-queue-type"] = "quorum"
+            },
+
             Bindings =
             [
                 new()
                 {
                     Key = "failing",
-                    RoutingKey = "asgard-test",
+                    RoutingKey = "asgard.test",
                     Retry = new RetrySettings
                     {
                         MaxRetries = 2,
-                        DelaysSeconds = [2, 4]
+                        DelaysSeconds = [5, 7]
                     }
                 }
             ]

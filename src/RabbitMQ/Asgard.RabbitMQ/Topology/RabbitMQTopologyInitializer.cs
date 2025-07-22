@@ -39,10 +39,10 @@ internal sealed class RabbitMQTopologyInitializer(
             // Binding delle routing key principali
             foreach (var binding in config.Bindings)
             {
-                await builder.BindQueueAsync(config.Queue, config.Exchange, binding.RoutingKey);
+                var routingKey = binding.RoutingKey ?? string.Empty;
+                await builder.BindQueueAsync(config.Queue, config.Exchange, routingKey);
             }
 
-            // Se non c'è una coda di retry allora il binding non serve
             if (!string.IsNullOrWhiteSpace(config.RetryQueue))
             {
                 await builder.DeclareQueueAsync(config.RetryQueue, config.RetryQueueArguments);
@@ -55,7 +55,8 @@ internal sealed class RabbitMQTopologyInitializer(
                     if (binding.Retry is null)
                         continue;
 
-                    await builder.BindQueueAsync(config.RetryQueue, retryExchange, binding.RoutingKey);
+                    var routingKey = binding.RoutingKey ?? string.Empty;
+                    await builder.BindQueueAsync(config.RetryQueue, retryExchange, routingKey);
                 }
             }
 

@@ -10,5 +10,5 @@ internal interface IRabbitMQTopologyBuilder
 
     Task DeclareQueueAsync(string queueName, IDictionary<string, object?>? arguments = null);
 
-    Task BindQueueAsync(string queueName, string exchangeName, string? routingKey = null);
+    Task BindQueueAsync(string queueName, string exchangeName, string? routingKey = "");
 }

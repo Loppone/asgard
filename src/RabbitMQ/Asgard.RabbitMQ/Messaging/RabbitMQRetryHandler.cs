@@ -9,6 +9,8 @@ namespace Asgard.RabbitMQ.Messaging;
 /// </summary>
 internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
 {
+    private const string RetryCountHeader = "x-retry-count";
+
     public async Task HandleRetryAsync(
         IChannel channel,
         BasicDeliverEventArgs args,
@@ -37,16 +39,27 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
             ? deathRaw as IList<object>
             : null;
 
-
+        var currentRoutingKey = args.RoutingKey ?? string.Empty;
         var retryCount = 0;
 
-        if (xDeath is [var entryRaw] && entryRaw is Dictionary<string, object> entry)
+        if (xDeath != null)
         {
-            if (entry.TryGetValue("queue", out var queueObj) &&
-                Encoding.UTF8.GetString((byte[])queueObj) == config.RetryQueue &&
-                entry.TryGetValue("count", out var countObj))
+            foreach (var entryRaw in xDeath.OfType<Dictionary<string, object>>())
             {
-                retryCount = Convert.ToInt32(countObj);
+                var queueName = entryRaw.TryGetValue("queue", out var q)
+                    ? Encoding.UTF8.GetString((byte[])q)
+                    : null;
+
+                var rk = entryRaw.TryGetValue("routing-keys", out var rkList) && rkList is IList<object> rks && rks.Count > 0
+                    ? Encoding.UTF8.GetString((byte[])rks[0])
+                    : null;
+
+                if (queueName == config.RetryQueue && rk == currentRoutingKey &&
+                    entryRaw.TryGetValue("count", out var countObj))
+                {
+                    retryCount = Convert.ToInt32(countObj);
+                    break;
+                }
             }
         }
 

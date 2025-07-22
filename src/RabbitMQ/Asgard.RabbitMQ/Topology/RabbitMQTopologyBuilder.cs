@@ -34,7 +34,7 @@ internal sealed class RabbitMQTopologyBuilder(
             arguments: arguments);
     }
 
-    public async Task BindQueueAsync(string queue, string exchange, string? routingKey = null)
+    public async Task BindQueueAsync(string queue, string exchange, string? routingKey = "")
     {
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();

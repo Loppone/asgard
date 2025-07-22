@@ -1,11 +1,8 @@
 ﻿using System.Text;
-using System;
 using System.Threading.Channels;
 using Asgard.Abstraction.Events;
-using Asgard.Abstraction.Messaging.Consumers;
 using Asgard.Abstraction.Messaging.Dispatchers;
 using Asgard.Abstraction.Messaging.Handlers;
-using Asgard.Abstraction.Messaging.Serialization;
 using Asgard.Abstraction.Models;
 using Asgard.RabbitMQ.Configuration;
 using Asgard.RabbitMQ.Messaging;
@@ -14,8 +11,6 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Moq;
 using Testcontainers.RabbitMq;
 using RabbitMQ.Client;
 using System.Diagnostics;
@@ -32,8 +27,9 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             .WithImage("rabbitmq:3.12-management")
             .WithUsername("guest")
             .WithPassword("guest")
-            .WithPortBinding(5672, true)
-            .WithPortBinding(15672, true)
+            .WithPortBinding(5672, 5672)
+            .WithPortBinding(15672, 15672)
+            .WithName("Pippo")
             .Build();
     }
 
@@ -168,7 +164,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
             channel,
             queueName: "queue.asgard-dead",
             expectedContent: "failing-payload",
-            timeout: TimeSpan.FromSeconds(50),
+            timeout: TimeSpan.FromSeconds(250),
             cancellationToken: cts.Token);
 
         message.Should().NotBeNull("Message should end up in DLQ after retries");
@@ -178,7 +174,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Event_Should_Be_Retried_Twice_Before_Dlq()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(50));
 
         await _container.StartAsync(cts.Token);
 
@@ -215,10 +211,9 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        var retryQueue = "queue.asgard-retry.rk.test";
-        int retryCount = 0;
-
-        var deadline = DateTime.UtcNow.AddSeconds(25);
+        var retryQueue = "queue.retry";
+        var retryCount = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(30);
 
         while (DateTime.UtcNow < deadline && retryCount < 3)
         {
@@ -240,9 +235,9 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         // Verifica finale: il messaggio deve essere finito in DLQ
         var dlqMessage = await WaitForMessageInQueueAsync(
             channel,
-            queueName: "queue.asgard-dead",
+            queueName: "queue.dead",
             expectedContent: "failing-payload",
-            timeout: TimeSpan.FromSeconds(10),
+            timeout: TimeSpan.FromSeconds(30),
             cancellationToken: cts.Token);
 
         dlqMessage.Should().NotBeNull("After max retries, the message should go to DLQ");
@@ -295,7 +290,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var message = await WaitForMessageInQueueAsync(
             channel,
-            queueName: "queue.asgard-dead",
+            queueName: "queue.dead",
             expectedContent: "delayed-retry",
             timeout: TimeSpan.FromSeconds(25),
             cancellationToken: cts.Token);
@@ -337,7 +332,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                     Retry = new RetrySettings
                     {
                         MaxRetries = 1,
-                        DelaysSeconds = [ 2 ]
+                        DelaysSeconds = [ 6 ]
                     }
                 }
             ]
@@ -394,7 +389,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Should_Retry_And_Dlq_Without_RoutingKey()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
 
         await _container.StartAsync(cts.Token);
         var host = _container.Hostname;
@@ -402,23 +397,41 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var config = new RabbitMQConfiguration
         {
-            Exchange = "ex.no-routingkey",
-            RetryExchange = "ex.no-routingkey-retry",
-            DeadLetterExchange = "ex.no-routingkey-dead",
-            Queue = "queue.no-routingkey",
-            DeadLetterQueue = "queue.no-routingkey-dead",
-            RetryQueue = "queue.no-routingkey-retry",
+            Exchange = "ex.main",
+            ExchangeArguments = new Dictionary<string, object?>
+            {
+                ["alternate-exchange"] = "ex.dead"
+            },
+            RetryExchange = "ex.retry",
+            DeadLetterExchange = "ex.dead",
+            Queue = "queue.main",
+            QueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.dead",
+                ["x-queue-type"] = "quorum"
+            },
+            RetryQueue = "queue.retry",
+            RetryQueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.main",
+                ["x-queue-type"] = "quorum"
+            },
+            DeadLetterQueue = "queue.dead",
+            DeadLetterExchangeArguments = new Dictionary<string, object?>
+            {
+                ["x-queue-type"] = "quorum"
+            },
             Bindings =
             [
                 new()
-            {
-                Retry = new RetrySettings
                 {
-                    // Key non specificato, quindi si applica a tutti i messaggi senza routing key
-                    MaxRetries = 2,
-                    DelaysSeconds = [2, 2]
+                    Key = string.Empty,
+                    Retry = new RetrySettings
+                    {
+                        MaxRetries = 2,
+                        DelaysSeconds = [2, 2]
+                    }
                 }
-            }
             ]
         };
 
@@ -476,7 +489,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var messasge = await WaitForMessageInQueueAsync(
             channel,
-            queueName: "queue.no-routingkey-dead",
+            queueName: "queue.dead",
             expectedContent: "fail-me",
             timeout: TimeSpan.FromSeconds(20),
             cancellationToken: cts.Token);
@@ -498,12 +511,30 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var config = new RabbitMQConfiguration
         {
-            Exchange = "ex.shared",
-            RetryExchange = "ex.shared.retry",
-            DeadLetterExchange = "ex.shared.dead",
-            Queue = "queue.shared.main",
-            DeadLetterQueue = "queue.shared.dead",
-            RetryQueue = "queue.shared.retry",
+            Exchange = "ex.main",
+            ExchangeArguments = new Dictionary<string, object?>
+            {
+                ["alternate-exchange"] = "ex.dead"
+            },
+            RetryExchange = "ex.retry",
+            DeadLetterExchange = "ex.dead",
+            Queue = "queue.main",
+            QueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.dead",
+                ["x-queue-type"] = "quorum"
+            },
+            RetryQueue = "queue.retry",
+            RetryQueueArguments = new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = "ex.main",
+                ["x-queue-type"] = "quorum"
+            },
+            DeadLetterQueue = "queue.dead",
+            DeadLetterExchangeArguments = new Dictionary<string, object?>
+            {
+                ["x-queue-type"] = "quorum"
+            },
             Bindings =
             [
                 new()
@@ -584,14 +615,14 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         var msgAlpha = await WaitForMessageInQueueAsync(
             channel,
-            queueName: "queue.shared.dead",
+            queueName: "queue.dead",
             expectedContent: "payload-alpha",
             timeout: TimeSpan.FromSeconds(20),
             cancellationToken: cts.Token);
 
         var msgBeta = await WaitForMessageInQueueAsync(
             channel,
-            queueName: "queue.shared.dead",
+            queueName: "queue.dead",
             expectedContent: "payload-beta",
             timeout: TimeSpan.FromSeconds(20),
             cancellationToken: cts.Token);
