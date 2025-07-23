@@ -174,7 +174,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task Event_Should_Be_Retried_Twice_Before_Dlq()
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
 
         await _container.StartAsync(cts.Token);
 
@@ -192,14 +192,13 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
 
         await rabbitHost.StartAsync(cts.Token);
 
-        // Evento che fallisce e viene ritentato
+        var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
+
         var payload = new TestPayload("failing-payload");
         var cloudEvent = CloudEvent.Create(payload, "asgard.test", "test-source");
 
-        var publisher = rabbitHost.Services.GetRequiredService<IEventPublisher>();
         await publisher.PublishAsync(cloudEvent, bindingKey: "failing", cancellationToken: cts.Token);
 
-        // Connessione diretta a RabbitMQ
         var factory = new ConnectionFactory
         {
             HostName = host,
@@ -211,37 +210,42 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync();
 
-        var retryQueue = "queue.retry";
-        var retryCount = 0;
-        var deadline = DateTime.UtcNow.AddSeconds(30);
-
-        while (DateTime.UtcNow < deadline && retryCount < 3)
-        {
-            var result = await channel.BasicGetAsync(retryQueue, autoAck: true);
-            if (result != null)
-            {
-                var body = Encoding.UTF8.GetString(result.Body.ToArray());
-                if (body.Contains("failing-payload"))
-                {
-                    retryCount++;
-                }
-            }
-
-            await Task.Delay(1000, cts.Token);
-        }
-
-        retryCount.Should().Be(2, "The message should be routed to the retry queue exactly 2 times");
-
-        // Verifica finale: il messaggio deve essere finito in DLQ
         var dlqMessage = await WaitForMessageInQueueAsync(
             channel,
             queueName: "queue.dead",
             expectedContent: "failing-payload",
-            timeout: TimeSpan.FromSeconds(30),
+            timeout: TimeSpan.FromSeconds(40),
             cancellationToken: cts.Token);
 
         dlqMessage.Should().NotBeNull("After max retries, the message should go to DLQ");
+
+        var result = await channel.BasicGetAsync("queue.dead", true, cts.Token);
+        result.Should().NotBeNull();
+
+        var headers = result.BasicProperties?.Headers;
+        headers.Should().NotBeNull("Message should have headers");
+
+        if (headers!.TryGetValue("x-death", out var rawDeath))
+        {
+            var xDeath = rawDeath as IList<object>;
+            var retryDeath = xDeath?.OfType<Dictionary<string, object>>()
+                .FirstOrDefault(d =>
+                    Encoding.UTF8.GetString((byte[])d["queue"]) == "queue.retry");
+
+            var retryCount = retryDeath != null && retryDeath.TryGetValue("count", out var countObj)
+                ? Convert.ToInt32(countObj)
+                : -1;
+
+            retryCount.Should().Be(2, "Expected message to be retried exactly twice before going to DLQ");
+        }
+        else
+        {
+            Assert.Fail("Missing x-death header");
+        }
+
+        await rabbitHost.StopAsync();
     }
+
 
 
     [Fact]

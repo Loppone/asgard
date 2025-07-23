@@ -9,37 +9,31 @@ namespace Asgard.RabbitMQ.Messaging;
 /// </summary>
 internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
 {
-    private const string RetryCountHeader = "x-retry-count";
-
     public async Task HandleRetryAsync(
         IChannel channel,
         BasicDeliverEventArgs args,
         RabbitMQConfiguration config,
         CancellationToken cancellationToken)
     {
-        // Recupera la routing key (vuota se null)
         var routingKey = args.RoutingKey ?? string.Empty;
 
-        // Trova la configurazione di retry associata alla routing key
         var retryConfig = config.Bindings.FirstOrDefault(b => b.RoutingKey == routingKey)
                        ?? config.Bindings.FirstOrDefault(b => b.RoutingKey is null);
 
         if (retryConfig is null || retryConfig.Retry is null || string.IsNullOrWhiteSpace(config.RetryQueue))
         {
-            // Nessuna configurazione valida, manda direttamente in DLQ
             await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
             return;
         }
 
         var retrySettings = retryConfig.Retry;
 
-        // Recupera l'header x-death per sapere quante volte è stato ritentato
+        // Estrai x-death
         var headers = args.BasicProperties?.Headers;
         var xDeath = headers != null && headers.TryGetValue("x-death", out var deathRaw)
             ? deathRaw as IList<object>
             : null;
 
-        var currentRoutingKey = args.RoutingKey ?? string.Empty;
         var retryCount = 0;
 
         if (xDeath != null)
@@ -54,7 +48,7 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
                     ? Encoding.UTF8.GetString((byte[])rks[0])
                     : null;
 
-                if (queueName == config.RetryQueue && rk == currentRoutingKey &&
+                if (queueName == config.RetryQueue && rk == routingKey &&
                     entryRaw.TryGetValue("count", out var countObj))
                 {
                     retryCount = Convert.ToInt32(countObj);
@@ -63,41 +57,43 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
             }
         }
 
+        Console.WriteLine($"[RetryHandler] RetryCount: {retryCount}");
+
         if (retryCount >= retrySettings.MaxRetries)
         {
-            // Superato numero massimo -> DLQ
             await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
             return;
         }
 
-        // Ripubblica sul retry exchange usando la routing key della retry queue
         if (string.IsNullOrWhiteSpace(config.RetryExchange))
         {
-            // Exchange non configurato, manda in DLQ
-            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken);
+            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
             return;
         }
 
-        // Delay dinamico per questo retry (es. DelaysSeconds[retryCount])
         var delaySeconds = retrySettings.DelaysSeconds.ElementAtOrDefault(retryCount);
 
         if (delaySeconds <= 0)
         {
-            // Se delay non previsto → manda in DLQ
-            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken);
+            await channel.BasicNackAsync(args.DeliveryTag, false, requeue: false, cancellationToken: cancellationToken);
             return;
         }
 
+        // Copia gli header esistenti e aggiungi un ID unico per differenziare i retry
         var originalProps = args.BasicProperties;
+        var newHeaders = originalProps?.Headers != null
+            ? new Dictionary<string, object>(originalProps.Headers!)
+            : new Dictionary<string, object>();
+
+        newHeaders["x-retry-id"] = Guid.NewGuid().ToString();
 
         var props = new BasicProperties
         {
             ContentType = originalProps?.ContentType,
             DeliveryMode = originalProps?.DeliveryMode ?? DeliveryModes.Persistent,
-            Headers = originalProps?.Headers,
+            Headers = newHeaders!,
             Expiration = (delaySeconds * 1000).ToString()
         };
-
 
         await channel.BasicPublishAsync(
             exchange: config.RetryExchange,
@@ -108,10 +104,6 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
             cancellationToken: cancellationToken
         );
 
-        // Ack del messaggio originale
         await channel.BasicAckAsync(args.DeliveryTag, false, cancellationToken);
-
-        //await channel.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, cancellationToken);
-
     }
 }
