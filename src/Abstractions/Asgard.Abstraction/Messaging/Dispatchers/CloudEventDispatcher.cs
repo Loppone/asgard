@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Asgard.Abstraction.Models;
 using Asgard.Abstraction.Messaging.Handlers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Asgard.Abstraction.Messaging.Dispatchers;
 
@@ -9,7 +10,7 @@ namespace Asgard.Abstraction.Messaging.Dispatchers;
 /// l’elaborazione passando il payload deserializzato.
 /// </summary>
 public sealed class CloudEventDispatcher(
-    IServiceProvider serviceProvider,
+    IServiceScopeFactory scopeFactory,
     ICloudEventTypeMapper typeMapper,
     ICloudEventSerializer serializer) : ICloudEventDispatcher
 {
@@ -26,9 +27,11 @@ public sealed class CloudEventDispatcher(
         // Deserializza il payload nel tipo corretto
         var message = serializer.Deserialize(cloudEvent.Data, targetType);
 
+        using var scope = scopeFactory.CreateScope();
+
         // Risolve dinamicamente ICloudEventHandler<T>
         var handlerType = typeof(ICloudEventHandler<>).MakeGenericType(targetType);
-        var handler = serviceProvider.GetService(handlerType) ?? 
+        var handler = scope.ServiceProvider.GetService(handlerType) ?? 
             throw new InvalidOperationException($"No ICloudEventHandler registered for type '{cloudEvent.Type}'.");
 
         // Invoca l'handler tramite reflection

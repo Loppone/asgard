@@ -28,34 +28,19 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
 
         var retrySettings = retryConfig.Retry;
 
-        // Estrai x-death
-        var headers = args.BasicProperties?.Headers;
-        var xDeath = headers != null && headers.TryGetValue("x-death", out var deathRaw)
-            ? deathRaw as IList<object>
-            : null;
+        var headers = args.BasicProperties?.Headers != null
+            ? new Dictionary<string, object>(args.BasicProperties.Headers!)
+            : [];
 
         var retryCount = 0;
 
-        if (xDeath != null)
+        if (headers.TryGetValue("x-retry-count", out var raw) && raw is byte[] bytes)
         {
-            foreach (var entryRaw in xDeath.OfType<Dictionary<string, object>>())
-            {
-                var queueName = entryRaw.TryGetValue("queue", out var q)
-                    ? Encoding.UTF8.GetString((byte[])q)
-                    : null;
-
-                var rk = entryRaw.TryGetValue("routing-keys", out var rkList) && rkList is IList<object> rks && rks.Count > 0
-                    ? Encoding.UTF8.GetString((byte[])rks[0])
-                    : null;
-
-                if (queueName == config.RetryQueue && rk == routingKey &&
-                    entryRaw.TryGetValue("count", out var countObj))
-                {
-                    retryCount = Convert.ToInt32(countObj);
-                    break;
-                }
-            }
+            var str = Encoding.UTF8.GetString(bytes);
+            _ = int.TryParse(str, out retryCount);
         }
+
+        retryCount++;
 
         Console.WriteLine($"[RetryHandler] RetryCount: {retryCount}");
 
@@ -79,19 +64,15 @@ internal sealed class RabbitMQRetryHandler : IRabbitMQRetryHandler
             return;
         }
 
-        // Copia gli header esistenti e aggiungi un ID unico per differenziare i retry
-        var originalProps = args.BasicProperties;
-        var newHeaders = originalProps?.Headers != null
-            ? new Dictionary<string, object>(originalProps.Headers!)
-            : new Dictionary<string, object>();
+        headers["x-retry-count"] = Encoding.UTF8.GetBytes(retryCount.ToString());
 
-        newHeaders["x-retry-id"] = Guid.NewGuid().ToString();
+        var originalProps = args.BasicProperties;
 
         var props = new BasicProperties
         {
             ContentType = originalProps?.ContentType,
             DeliveryMode = originalProps?.DeliveryMode ?? DeliveryModes.Persistent,
-            Headers = newHeaders!,
+            Headers = headers!,
             Expiration = (delaySeconds * 1000).ToString()
         };
 

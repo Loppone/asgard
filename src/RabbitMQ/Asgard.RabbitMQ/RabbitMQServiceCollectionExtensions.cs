@@ -65,7 +65,7 @@ public static class RabbitMQServiceCollectionExtensions
 
         services.AddSingleton<ICloudEventDispatcher>(sp =>
             new CloudEventDispatcher(
-                sp,
+                sp.GetRequiredService<IServiceScopeFactory>(),
                 sp.GetRequiredService<ICloudEventTypeMapper>(),
                 sp.GetRequiredService<ICloudEventSerializer>()));
     }
