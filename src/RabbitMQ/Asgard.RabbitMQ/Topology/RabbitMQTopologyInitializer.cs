@@ -36,7 +36,7 @@ internal sealed class RabbitMQTopologyInitializer(
             // Coda principale
             await builder.DeclareQueueAsync(config.Queue, config.QueueArguments);
 
-            // Binding delle routing key principali
+            // Binding delle routing key principali per i subscribers
             foreach (var binding in config.Bindings)
             {
                 var routingKey = binding.RoutingKey ?? string.Empty;

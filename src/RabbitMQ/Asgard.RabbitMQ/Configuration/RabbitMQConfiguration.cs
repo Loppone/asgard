@@ -34,6 +34,24 @@ public class RabbitMQConfiguration
     /// Se RoutingKey è null, si applica una configurazione neutra (senza RK).
     /// </summary>
     public List<RoutingKeyBinding> Bindings { get; set; } = [];
+    public List<RoutingKeyPublish> Publish { get; set; } = [];
+}
+
+/// <summary>
+/// Descrive la configurazione dei parametri del publisher.
+/// Si assume che l'exchange sia quello principale.
+/// </summary>
+public class RoutingKeyPublish
+{
+    /// <summary>
+    /// Chiave logica che rappresenta il tipo di messaggio (usata dall'applicazione)
+    /// </summary>
+    public string? Key { get; set; } = default!;
+
+    /// <summary>
+    /// Routing key associata. Se null, si assume gestione "senza routing key".
+    /// </summary>
+    public string? RoutingKey { get; set; }
 }
 
 

@@ -16,7 +16,7 @@ internal sealed class RabbitPublisher(
 
     public async Task PublishAsync(
         CloudEvent cloudEvent,
-        string? bindingKey = null,
+        string? publishKey = null,
         CancellationToken cancellationToken = default)
     {
         var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName, cancellationToken);
@@ -30,7 +30,7 @@ internal sealed class RabbitPublisher(
             DeliveryMode = DeliveryModes.Persistent,
         };
 
-        var routingKey = ResolveRoutingKey(bindingKey);
+        var routingKey = ResolveRoutingKey(publishKey);
 
         await channel.BasicPublishAsync(
             exchange: _config.Exchange,
@@ -43,17 +43,17 @@ internal sealed class RabbitPublisher(
     }
 
     /// <summary>
-    /// Risolve la routing key in base alla bindingKey specificata.
+    /// Risolve la routing key in base alla publishKey specificata.
     /// Se nulla, ritorna string.Empty (es. exchange fanout).
     /// </summary>
-    private string? ResolveRoutingKey(string? bindingKey)
+    private string? ResolveRoutingKey(string? publishKey)
     {
-        if (bindingKey is null)
+        if (publishKey is null)
             return null!;
 
-        var binding = _config.Bindings.FirstOrDefault(b => b.Key == bindingKey)
-            ?? throw new InvalidOperationException($"No binding found for key '{bindingKey}'");
+        var publish = _config.Publish.FirstOrDefault(b => b.Key == publishKey)
+            ?? throw new InvalidOperationException($"No binding found for key '{publishKey}'");
 
-        return binding.RoutingKey ?? string.Empty;
+        return publish.RoutingKey ?? string.Empty;
     }
 }
