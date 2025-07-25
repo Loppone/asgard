@@ -20,13 +20,21 @@ public static class RabbitMQServiceCollectionExtensions
         else if (configuration is not null)
             services.Configure<RabbitMQOptions>(configuration.GetSection("RabbitMqOptions"));
 
+        RabbitMQConfiguration? rabbitConfig = null;
+
         if (configurations is not null)
-            services.Configure<RabbitMQSubscriptionOptions>(opts =>
-            {
-                opts.Configurations = [.. configurations];
-            });
+        {
+            var list = configurations.ToList();
+            services.Configure<RabbitMQSubscriptionOptions>(opts => opts.Configurations = list);
+            rabbitConfig = list.FirstOrDefault();
+        }
         else if (configuration is not null)
-            services.Configure<RabbitMQSubscriptionOptions>(configuration.GetSection("RabbitMQSubscriptionOptions"));
+        {
+            var section = configuration.GetSection("RabbitMQSubscriptionOptions");
+            var opts = section.Get<RabbitMQSubscriptionOptions>() ?? new();
+            services.Configure<RabbitMQSubscriptionOptions>(section);
+            rabbitConfig = opts.Configurations.FirstOrDefault();
+        }
 
         services.AddSingleton<RabbitMQClient.IConnectionFactory>(sp =>
         {
@@ -41,20 +49,12 @@ public static class RabbitMQServiceCollectionExtensions
             };
         });
 
-        RegisterCoreServices(services, configuration!);
+       // RegisterCoreServices(services, configuration!);
 
-        return services;
-    }
-
-    private static void RegisterCoreServices(IServiceCollection services, IConfiguration configuration)
-    {
         services.AddSingleton<RabbitMQStartupSynchronizer>();
         services.AddSingleton<IHostedService, RabbitMQTopologyInitializer>();
         services.AddSingleton<IRabbitMQTopologyBuilder, RabbitMQTopologyBuilder>();
         services.AddSingleton<IEventPublisher, RabbitPublisher>();
-
-        services.AddSingleton<IEventSubscriber, RabbitEventSubscriber>();
-        services.AddHostedService<RabbitEventSubscriberHostedService>();
 
         services.TryAddSingleton<ICloudEventSerializer, CloudEventJsonSerializer>();
         services.AddSingleton<IValidateOptions<RabbitMQSubscriptionOptions>, RabbitMQSubscriptionOptionsValidation>();
@@ -66,5 +66,19 @@ public static class RabbitMQServiceCollectionExtensions
                 sp.GetRequiredService<IServiceScopeFactory>(),
                 sp.GetRequiredService<ICloudEventTypeMapper>(),
                 sp.GetRequiredService<ICloudEventSerializer>()));
+
+        // Registrazione del subscriber SOLO se richiesto da configurazione
+        if (rabbitConfig?.HasConsumerTopology() == true)
+        {
+            services.AddSingleton<IEventSubscriber, RabbitEventSubscriber>();
+            services.AddHostedService<RabbitEventSubscriberHostedService>();
+        }
+
+        return services;
+    }
+
+    private static void RegisterCoreServices(IServiceCollection services, IConfiguration configuration)
+    {
+
     }
 }
