@@ -35,6 +35,11 @@ public class RabbitMQConfiguration
     /// </summary>
     public List<RoutingKeyBinding> Bindings { get; set; } = [];
     public List<RoutingKeyPublish> Publish { get; set; } = [];
+
+    public bool HasConsumerTopology()
+    {
+        return Bindings.Any(b => b.RoutingKey != null && b.EnableSubscriber);
+    }
 }
 
 /// <summary>
@@ -69,6 +74,13 @@ public class RoutingKeyBinding
     /// Routing key associata. Se null, si assume gestione "senza routing key".
     /// </summary>
     public string? RoutingKey { get; set; }
+
+    /// <summary>
+    /// Indica se il subscriber è abilitato.
+    /// Ha senso in quanto se abbiamo solo publisher la coda va comunque bindata, ma non attivata
+    /// altrimenti il subscriber generato dal Binding triggererebbe anche se non si vuole.
+    /// </summary>
+    public bool EnableSubscriber { get; set; } = true;
 
     /// <summary>
     /// Impostazioni per il retry specifiche di questa routing key.

@@ -41,18 +41,16 @@ public static class RabbitMQServiceCollectionExtensions
             };
         });
 
-        RegisterCoreServices(services);
-        
+        RegisterCoreServices(services, configuration!);
+
         return services;
     }
 
-    private static void RegisterCoreServices(IServiceCollection services)
+    private static void RegisterCoreServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<RabbitMQStartupSynchronizer>();
-
         services.AddSingleton<IHostedService, RabbitMQTopologyInitializer>();
         services.AddSingleton<IRabbitMQTopologyBuilder, RabbitMQTopologyBuilder>();
-        
         services.AddSingleton<IEventPublisher, RabbitPublisher>();
 
         services.AddSingleton<IEventSubscriber, RabbitEventSubscriber>();

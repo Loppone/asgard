@@ -23,7 +23,7 @@ internal sealed class RabbitMQTopologyInitializer(
         {
 
             // Exchange principale
-            await builder.DeclareExchangeAsync(config.Exchange, config.ExchangeType,  config.ExchangeArguments);
+            await builder.DeclareExchangeAsync(config.Exchange, config.ExchangeType, config.ExchangeArguments);
 
             // Retry exchange
             if (!string.IsNullOrWhiteSpace(config.RetryExchange))
@@ -33,8 +33,9 @@ internal sealed class RabbitMQTopologyInitializer(
             if (!string.IsNullOrWhiteSpace(config.DeadLetterExchange))
                 await builder.DeclareExchangeAsync(config.DeadLetterExchange, config.DeadLetterExchangeType ?? "fanout", config.DeadLetterExchangeArguments);
 
-            // Coda principale
-            await builder.DeclareQueueAsync(config.Queue, config.QueueArguments);
+            // Coda principale (verifico se esiste perchè se un servizio ha solo il publisher la coda non serve)
+            if (!string.IsNullOrWhiteSpace(config.Queue))
+                await builder.DeclareQueueAsync(config.Queue, config.QueueArguments);
 
             // Binding delle routing key principali per i subscribers
             foreach (var binding in config.Bindings)

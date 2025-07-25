@@ -32,10 +32,20 @@ internal sealed class RabbitPublisher(
 
         var routingKey = ResolveRoutingKey(publishKey);
 
+        channel.BasicReturnAsync += async (_, args) =>
+        {
+            Console.WriteLine($"[RabbitMQ] Message not routed!");
+            Console.WriteLine($"Exchange: {args.Exchange}");
+            Console.WriteLine($"RoutingKey: {args.RoutingKey}");
+            Console.WriteLine($"ReplyCode: {args.ReplyCode} - {args.ReplyText}");
+
+            await Task.CompletedTask;
+        };
+
         await channel.BasicPublishAsync(
             exchange: _config.Exchange,
             routingKey: routingKey!,
-            mandatory: false,
+            mandatory: true,
             basicProperties: props,
             body: body,
             cancellationToken: cancellationToken
