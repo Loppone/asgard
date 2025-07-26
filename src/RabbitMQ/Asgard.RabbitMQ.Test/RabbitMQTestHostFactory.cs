@@ -28,13 +28,13 @@ public static class RabbitMQTestHostFactory
 
         var rabbitConfig = new RabbitMQConfiguration
         {
-            Exchange = "ex.main",
+            Exchange = "ex.harleydikkinson",
             ExchangeType = "direct",
             ExchangeArguments = new Dictionary<string, object?>
             {
                 ["alternate-exchange"] = "ex.dead"
             },
-            Queue = "queue.main",
+            Queue = "queue.asgard",
             QueueArguments = new Dictionary<string, object?>
             {
                 ["x-dead-letter-exchange"] = "ex.dead",
@@ -46,23 +46,30 @@ public static class RabbitMQTestHostFactory
             RetryQueue = "queue.retry",
             RetryQueueArguments = new Dictionary<string, object?>
             {
-                ["x-dead-letter-exchange"] = "ex.main",
-                ["x-queue-type"] = "quorum",
-                ["x-dead-letter-routing-key"] = "asgard.test",
+                ["x-dead-letter-exchange"] = "ex.harleydikkinson",
+                ["x-queue-type"] = "quorum"
             },
 
             DeadLetterExchange = "ex.dead",
             DeadLetterExchangeType = "fanout",
             DeadLetterQueue = "queue.dead",
-            DeadLetterExchangeArguments = new Dictionary<string, object?>
+            DeadLetterQueueArguments = new Dictionary<string, object?>
             {
                 ["x-queue-type"] = "quorum"
             },
-
+            Publish =
+            [
+                new()
+                {
+                    Key = "failing",
+                    RoutingKey = "asgard.test"
+                }
+            ],
             Bindings =
             [
                 new()
                 {
+                    EnableSubscriber=true,
                     Key = "failing",
                     RoutingKey = "asgard.test",
                     Retry = new RetrySettings

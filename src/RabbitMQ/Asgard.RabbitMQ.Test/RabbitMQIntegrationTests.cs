@@ -56,7 +56,7 @@ public sealed class RabbitMqIntegrationTests : IAsyncLifetime
                 // Configurazione RabbitMQ
                 var rabbitConfig = new RabbitMQConfiguration
                 {
-                    Exchange = "test.exchange",
+                    Exchange = "test.harleydikkinson",
                     ExchangeType = "fanout",
                     Queue = "test.queue",
                     Bindings =
