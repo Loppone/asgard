@@ -18,7 +18,7 @@ public static class RabbitMQServiceCollectionExtensions
         if (configureOptions is not null)
             services.Configure(configureOptions);
         else if (configuration is not null)
-            services.Configure<RabbitMQOptions>(configuration.GetSection("RabbitMqOptions"));
+            services.Configure<RabbitMQOptions>(configuration.GetSection("RabbitMq"));
 
         RabbitMQConfiguration? rabbitConfig = null;
 
