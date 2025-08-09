@@ -7,9 +7,10 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		
 		<PackageId>DoggoLabs.Asgard.RabbitMQ</PackageId>
-		<Version>1.2.3</Version>
+		<Version>1.2.4</Version>
 		<Authors>Maximiliano Bertoli</Authors>
 		<Company>DoggoLabs</Company>
+		<PackageIcon>icon_thor_128x128.png</PackageIcon>
 		<Description>
 			Adapter for integrating RabbitMQ into the Asgard messaging infrastructure.
 			Provides a clean, broker-specific implementation for publishing and consuming CloudEvents with advanced retry, dead-lettering, and routing key handling.
@@ -26,6 +27,10 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<None Include="icon_thor_128x128.png" Pack="true" PackagePath="" />
+	</ItemGroup>
+	
 	<ItemGroup>
 		<None Include="README.md" Pack="true" PackagePath="" />
 	</ItemGroup>

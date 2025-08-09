@@ -1,0 +1,45 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # es: v1.2.5
+
+jobs:
+  pack_publish:
+    runs-on: ubuntu-latest
+    env:
+      NUGET_SOURCE: https://api.nuget.org/v3/index.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Derive version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Pack (SemVer dal tag)
+        run: |
+          dotnet pack \
+            --configuration Release \
+            -p:PackageVersion=${{ env.VERSION }} \
+            -p:ContinuousIntegrationBuild=true \
+            -o ./nupkgs
+
+      - name: Upload nupkgs
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: nupkgs/*.nupkg
+
+      - name: Push to NuGet
+        run: dotnet nuget push "nupkgs/*.nupkg" \
+              --api-key "${{ secrets.NUGET_API_KEY }}" \
+              --source "${{ env.NUGET_SOURCE }}" \
+              --skip-duplicate
