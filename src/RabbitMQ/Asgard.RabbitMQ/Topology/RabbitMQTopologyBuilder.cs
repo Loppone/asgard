@@ -21,17 +21,20 @@ internal sealed class RabbitMQTopologyBuilder(
         }
         catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 404)
         {
-            await channel.ExchangeDeclareAsync(
-                exchange: exchange,
-                type: type,
-                durable: true,
-                autoDelete: false,
-                arguments: arguments);
-        }
-        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 406)
-        {
-            throw new InvalidOperationException(
-                $"Existing exchange '{exchange}' is incompatible with requested declaration.", ex);
+            try
+            {
+                await channel.ExchangeDeclareAsync(
+                    exchange: exchange,
+                    type: type,
+                    durable: true,
+                    autoDelete: false,
+                    arguments: arguments);
+            }
+            catch (OperationInterruptedException ex2) when (ex2.ShutdownReason?.ReplyCode == 406)
+            {
+                throw new InvalidOperationException(
+                    $"Existing exchange '{exchange}' is incompatible with requested declaration.", ex2);
+            }
         }
     }
 
@@ -53,10 +56,10 @@ internal sealed class RabbitMQTopologyBuilder(
                 autoDelete: false,
                 arguments: arguments);
         }
-        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 406)
+        catch (OperationInterruptedException ex2) when (ex2.ShutdownReason?.ReplyCode == 406)
         {
             throw new InvalidOperationException(
-                $"Existing queue '{queue}' is incompatible with requested declaration.", ex);
+                $"Existing queue '{queue}' is incompatible with requested declaration.", ex2);
         }
     }
 
