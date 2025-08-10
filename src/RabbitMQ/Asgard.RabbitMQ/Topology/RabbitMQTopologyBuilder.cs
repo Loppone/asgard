@@ -1,11 +1,13 @@
-﻿namespace Asgard.RabbitMQ.Topology;
+﻿using RabbitMQ.Client.Exceptions;
+
+namespace Asgard.RabbitMQ.Topology;
 
 /// <summary>
 /// Implementazione concreta del costruttore topologico che usa RabbitMQ.Client per dichiarare exchange, queue e binding.
 /// </summary>
 internal sealed class RabbitMQTopologyBuilder(
     IConnectionFactory connectionFactory,
-    IOptions<RabbitMQOptions> options) 
+    IOptions<RabbitMQOptions> options)
     : IRabbitMQTopologyBuilder
 {
     public async Task DeclareExchangeAsync(string exchange, string type, IDictionary<string, object?>? arguments = null)
@@ -13,12 +15,24 @@ internal sealed class RabbitMQTopologyBuilder(
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();
 
-        await channel.ExchangeDeclareAsync(
-            exchange: exchange,
-            type: type,
-            durable: true,
-            autoDelete: false,
-            arguments: arguments);
+        try
+        {
+            await channel.ExchangeDeclarePassiveAsync(exchange);
+        }
+        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 404)
+        {
+            await channel.ExchangeDeclareAsync(
+                exchange: exchange,
+                type: type,
+                durable: true,
+                autoDelete: false,
+                arguments: arguments);
+        }
+        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 406)
+        {
+            throw new InvalidOperationException(
+                $"Existing exchange '{exchange}' is incompatible with requested declaration.", ex);
+        }
     }
 
     public async Task DeclareQueueAsync(string queue, IDictionary<string, object?>? arguments = null)
@@ -26,12 +40,24 @@ internal sealed class RabbitMQTopologyBuilder(
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();
 
-        await channel.QueueDeclareAsync(
-            queue: queue,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: arguments);
+        try
+        {
+            await channel.QueueDeclarePassiveAsync(queue);
+        }
+        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 404)
+        {
+            await channel.QueueDeclareAsync(
+                queue: queue,
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: arguments);
+        }
+        catch (OperationInterruptedException ex) when (ex.ShutdownReason?.ReplyCode == 406)
+        {
+            throw new InvalidOperationException(
+                $"Existing queue '{queue}' is incompatible with requested declaration.", ex);
+        }
     }
 
     public async Task BindQueueAsync(string queue, string exchange, string? routingKey = "")

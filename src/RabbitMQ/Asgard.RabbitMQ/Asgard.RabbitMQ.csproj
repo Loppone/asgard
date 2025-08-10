@@ -4,10 +4,9 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		
 		<PackageId>DoggoLabs.Asgard.RabbitMQ</PackageId>
-		<Version>1.2.4</Version>
+		<Version>1.2.5</Version>
 		<Authors>Maximiliano Bertoli</Authors>
 		<Company>DoggoLabs</Company>
 		<PackageIcon>icon_thor_128x128.png</PackageIcon>
@@ -28,11 +27,11 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<None Include="icon_thor_128x128.png" Pack="true" PackagePath="" />
+		<None Include="icon_thor_128x128.png" Pack="true" PackagePath="\" />
 	</ItemGroup>
 	
 	<ItemGroup>
-		<None Include="README.md" Pack="true" PackagePath="" />
+		<None Include="README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 	
 	<ItemGroup>

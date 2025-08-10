@@ -10,9 +10,8 @@ public class SampleEventPublisher(IEventPublisher publisher)
     private readonly Faker _faker = new("it");
     private readonly Random _random = new();
 
-    private const string Source = "sample-app";
-    private const string RoutingKeyUser = "user";
-    private const string RoutingKeyPerson = "person";
+    private const string BindingKeyUser = "pub-asgard-user";
+    private const string BindingKeyPerson = "pub-asgard-person";
 
     public async Task PublishRandomEventsAsync(int count, CancellationToken cancellationToken = default)
     {
@@ -25,10 +24,12 @@ public class SampleEventPublisher(IEventPublisher publisher)
                 var email = _faker.Internet.Email();
                 var user = new UserCreated(_faker.Internet.UserName(), email);
 
-                await _publisher.PublishAsync(user, new CloudEventOptions
-                {
-                    Source = Source
-                }, RoutingKeyUser, cancellationToken);
+                var ce = CloudEvent.Create(
+                    payload: user,
+                    type: "asgard-user",
+                    source: new Uri("https://example.com").ToString());
+
+                await _publisher.PublishAsync(ce, BindingKeyUser, cancellationToken);
             }
             else
             {
@@ -42,10 +43,12 @@ public class SampleEventPublisher(IEventPublisher publisher)
                         ? Gender.Male
                         : Gender.Female);
 
-                await _publisher.PublishAsync(person, new CloudEventOptions
-                {
-                    Source = Source
-                }, RoutingKeyPerson, cancellationToken);
+                var ce = CloudEvent.Create(
+                    payload: person,
+                    type: "asgard-person",
+                    source: new Uri("https://example.com").ToString());
+
+                await _publisher.PublishAsync(ce, BindingKeyPerson, cancellationToken);
             }
         }
     }
