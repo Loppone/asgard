@@ -22,8 +22,8 @@ builder.Services.AddSingleton<ICloudEventHandler<PersonCreated>, PersonCreatedHa
 builder.Services.AddSingleton<ICloudEventTypeMapper>(sp =>
 {
     var mapper = new CloudEventTypeMapper();
-    mapper.Register<UserCreated>("user.created");
-    mapper.Register<PersonCreated>("person.created");
+    mapper.Register<UserCreated>("asgard-user");
+    mapper.Register<PersonCreated>("asgard-person");
     return mapper;
 });
 

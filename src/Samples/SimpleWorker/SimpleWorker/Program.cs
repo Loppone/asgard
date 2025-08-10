@@ -9,7 +9,7 @@ using Asgard.Abstraction.Events;
 using Asgard.Abstraction.Messaging.Dispatchers;
 using Asgard.RabbitMQ.Messaging;
 
-const string ROUTINGKEY = "asgard";
+const string BINDINGKEY = "pub-asgard";
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -34,13 +34,11 @@ Console.Clear();
 // Simula una pubblicazione all'avvio
 var publisher = app.Services.GetRequiredService<IEventPublisher>();
 
-await publisher.PublishAsync(
-    new UserCreated(Guid.NewGuid(), "example@email.com"),
-    new CloudEventOptions
-    {
-        Source = "sample-app"
-    },
-    ROUTINGKEY,
-    CancellationToken.None);
+var ce = CloudEvent.Create(
+    payload: new UserCreated(Guid.NewGuid(), "max@test.it"),
+    type: "asgard",
+    source: new Uri("https://example.com").ToString());
+
+await publisher.PublishAsync(ce, BINDINGKEY);
 
 await app.RunAsync();
