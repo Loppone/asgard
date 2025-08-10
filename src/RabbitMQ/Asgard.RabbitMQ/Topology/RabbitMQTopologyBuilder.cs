@@ -10,8 +10,14 @@ internal sealed class RabbitMQTopologyBuilder(
     IOptions<RabbitMQOptions> options)
     : IRabbitMQTopologyBuilder
 {
-    public async Task DeclareExchangeAsync(string exchange, string type, IDictionary<string, object?>? arguments = null)
+    public async Task DeclareExchangeAsync(
+        string exchange, 
+        string type, 
+        IDictionary<string, object?>? arguments = null)
     {
+        TopologyExchangeGuard.Exchange(exchange, type);
+        arguments ??= new Dictionary<string, object?>(StringComparer.Ordinal);
+
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();
 
@@ -40,6 +46,9 @@ internal sealed class RabbitMQTopologyBuilder(
 
     public async Task DeclareQueueAsync(string queue, IDictionary<string, object?>? arguments = null)
     {
+        TopologyQueueGuard.Queue(queue);
+        arguments = TopologyQueueGuard.Arguments(arguments);
+
         await using var connection = await connectionFactory.CreateConnectionAsync(options.Value.ClientName);
         await using var channel = await connection.CreateChannelAsync();
 
@@ -74,4 +83,33 @@ internal sealed class RabbitMQTopologyBuilder(
             routingKey: routingKey ?? string.Empty,
             arguments: null);
     }
+}
+
+
+internal static class TopologyExchangeGuard
+{
+    private static readonly HashSet<string> Allowed = new(StringComparer.OrdinalIgnoreCase)
+        { "direct","fanout","topic","headers" };
+
+    public static void Exchange(string exchange, string type)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(exchange);
+        if (exchange.Length == 0)
+            throw new ArgumentException("Default exchange cannot be declared.", nameof(exchange));
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
+        if (!Allowed.Contains(type))
+            throw new ArgumentException($"Unsupported exchange type '{type}'.", nameof(type));
+    }
+}
+
+internal static class TopologyQueueGuard
+{
+    public static void Queue(string queue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(queue);
+    }
+
+    public static IDictionary<string, object?> Arguments(IDictionary<string, object?>? args)
+        => args ?? new Dictionary<string, object?>(StringComparer.Ordinal);
 }
